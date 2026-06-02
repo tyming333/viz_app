@@ -270,7 +270,7 @@
   function scrollSelectedObjectIntoView() {
     const button = els.objectList.querySelector(`button[data-object-index="${state.selectedObjectIndex}"]`);
     if (!button) return;
-    button.scrollIntoView({ block: "nearest" });
+    button.scrollIntoView({ block: "center" });
   }
 
   function updateEditorBboxInputs() {
@@ -368,7 +368,8 @@
       polygon.style.stroke = index === state.selectedObjectIndex ? "#facc15" : color;
       polygon.style.strokeWidth = String(state.boxStrokeWidth);
       polygon.style.fill = state.showBoxFill ? "" : "transparent";
-      polygon.addEventListener("click", () => {
+      polygon.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
         selectObject(index);
       });
       group.appendChild(polygon);
