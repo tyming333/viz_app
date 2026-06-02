@@ -20,7 +20,8 @@
     mainImage: document.getElementById("mainImage"),
     overlay: document.getElementById("overlay"),
     emptyState: document.getElementById("emptyState"),
-    fitBtn: document.getElementById("fitBtn"),
+    resetViewBtn: document.getElementById("resetViewBtn"),
+    fillToggleBtn: document.getElementById("fillToggleBtn"),
     zoomOutBtn: document.getElementById("zoomOutBtn"),
     zoomInBtn: document.getElementById("zoomInBtn"),
     zoomText: document.getElementById("zoomText"),
@@ -40,8 +41,11 @@
     currentImage: "",
     selectedObjectIndex: -1,
     zoom: 1,
+    panX: 0,
+    panY: 0,
     drag: null,
     pan: null,
+    showBoxFill: true,
     suppressNextClick: false
   };
 
@@ -191,7 +195,13 @@
     renderObjects();
     renderEditor();
     renderOverlay();
+    renderFillToggle();
     applyZoom();
+  }
+
+  function renderFillToggle() {
+    els.fillToggleBtn.classList.toggle("active", state.showBoxFill);
+    els.fillToggleBtn.setAttribute("aria-pressed", String(state.showBoxFill));
   }
 
   function renderObjects() {
@@ -270,6 +280,7 @@
       polygon.setAttribute("points", points.map((p) => p.join(",")).join(" "));
       polygon.setAttribute("class", index === state.selectedObjectIndex ? "poly active" : "poly");
       polygon.style.stroke = index === state.selectedObjectIndex ? "#facc15" : color;
+      polygon.style.fill = state.showBoxFill ? "" : "transparent";
       polygon.addEventListener("click", () => {
         state.selectedObjectIndex = index;
         renderAll();
@@ -383,9 +394,7 @@
 
   function applyZoom() {
     state.zoom = clampZoom(state.zoom);
-    els.stage.style.transform = `scale(${state.zoom})`;
-    els.stage.style.marginRight = `${Math.max(0, els.stage.offsetWidth * (state.zoom - 1))}px`;
-    els.stage.style.marginBottom = `${Math.max(0, els.stage.offsetHeight * (state.zoom - 1))}px`;
+    els.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
     els.zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
   }
 
@@ -398,14 +407,13 @@
     const rect = shell.getBoundingClientRect();
     const offsetX = clientX - rect.left;
     const offsetY = clientY - rect.top;
-    const imageX = (shell.scrollLeft + offsetX) / oldZoom;
-    const imageY = (shell.scrollTop + offsetY) / oldZoom;
+    const imageX = (offsetX - state.panX) / oldZoom;
+    const imageY = (offsetY - state.panY) / oldZoom;
 
     state.zoom = newZoom;
+    state.panX = offsetX - imageX * newZoom;
+    state.panY = offsetY - imageY * newZoom;
     applyZoom();
-
-    shell.scrollLeft = imageX * newZoom - offsetX;
-    shell.scrollTop = imageY * newZoom - offsetY;
   }
 
   function wheelZoom(event) {
@@ -423,8 +431,8 @@
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      left: els.canvasShell.scrollLeft,
-      top: els.canvasShell.scrollTop,
+      left: state.panX,
+      top: state.panY,
       moved: false
     };
     els.canvasShell.classList.add("is-panning");
@@ -439,8 +447,9 @@
       state.pan.moved = true;
       state.suppressNextClick = true;
     }
-    els.canvasShell.scrollLeft = state.pan.left - dx;
-    els.canvasShell.scrollTop = state.pan.top - dy;
+    state.panX = state.pan.left + dx;
+    state.panY = state.pan.top + dy;
+    applyZoom();
   }
 
   function endPan() {
@@ -452,13 +461,21 @@
     }, 0);
   }
 
-  function fitImage() {
+  function resetView() {
     const width = els.mainImage.naturalWidth || 0;
     const height = els.mainImage.naturalHeight || 0;
-    if (!width || !height) return;
+    if (!width || !height) {
+      state.zoom = 1;
+      state.panX = 0;
+      state.panY = 0;
+      applyZoom();
+      return;
+    }
     const availableWidth = els.canvasShell.clientWidth - 24;
     const availableHeight = els.canvasShell.clientHeight - 24;
     state.zoom = Math.min(1, availableWidth / width, availableHeight / height);
+    state.panX = Math.round((els.canvasShell.clientWidth - width * state.zoom) / 2);
+    state.panY = Math.round((els.canvasShell.clientHeight - height * state.zoom) / 2);
     applyZoom();
   }
 
@@ -526,7 +543,7 @@
   els.imageFilter.addEventListener("input", renderImageControls);
   els.imageSelect.addEventListener("change", (event) => selectImage(event.target.value));
   els.mainImage.addEventListener("load", () => {
-    fitImage();
+    resetView();
     renderAll();
     setStatus(`图片已加载：${state.currentImage}`, 100);
   });
@@ -534,7 +551,11 @@
     renderOverlay();
     setStatus(`图片加载失败，请检查 prefix：${state.currentImage}`, 0);
   });
-  els.fitBtn.addEventListener("click", fitImage);
+  els.resetViewBtn.addEventListener("click", resetView);
+  els.fillToggleBtn.addEventListener("click", () => {
+    state.showBoxFill = !state.showBoxFill;
+    renderAll();
+  });
   els.zoomOutBtn.addEventListener("click", () => {
     zoomAt(
       els.canvasShell.getBoundingClientRect().left + els.canvasShell.clientWidth / 2,

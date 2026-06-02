@@ -290,11 +290,16 @@ textarea {
   font-size: 12px;
 }
 
+.toolbar-actions button.active {
+  border-color: var(--accent);
+  background: #e7f7f4;
+}
+
 .canvas-shell {
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   cursor: grab;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -316,6 +321,7 @@ textarea {
   min-width: 100%;
   min-height: 100%;
   transform-origin: 0 0;
+  will-change: transform;
 }
 
 #mainImage {
