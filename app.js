@@ -40,7 +40,9 @@
     currentImage: "",
     selectedObjectIndex: -1,
     zoom: 1,
-    drag: null
+    drag: null,
+    pan: null,
+    suppressNextClick: false
   };
 
   const colors = ["#4ade80", "#38bdf8", "#facc15", "#fb7185", "#a78bfa", "#2dd4bf"];
@@ -301,6 +303,7 @@
 
   function startDrag(event, objectIndex, pointIndex) {
     event.preventDefault();
+    event.stopPropagation();
     state.selectedObjectIndex = objectIndex;
     state.drag = { objectIndex, pointIndex };
     els.overlay.setPointerCapture(event.pointerId);
@@ -324,6 +327,10 @@
 
   function endDrag() {
     state.drag = null;
+  }
+
+  function clampZoom(value) {
+    return Math.max(0.1, Math.min(4, value));
   }
 
   function applyEditor() {
@@ -375,11 +382,74 @@
   }
 
   function applyZoom() {
-    state.zoom = Math.max(0.1, Math.min(4, state.zoom));
+    state.zoom = clampZoom(state.zoom);
     els.stage.style.transform = `scale(${state.zoom})`;
     els.stage.style.marginRight = `${Math.max(0, els.stage.offsetWidth * (state.zoom - 1))}px`;
     els.stage.style.marginBottom = `${Math.max(0, els.stage.offsetHeight * (state.zoom - 1))}px`;
     els.zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
+  }
+
+  function zoomAt(clientX, clientY, nextZoom) {
+    const oldZoom = state.zoom;
+    const newZoom = clampZoom(nextZoom);
+    if (newZoom === oldZoom) return;
+
+    const shell = els.canvasShell;
+    const rect = shell.getBoundingClientRect();
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+    const imageX = (shell.scrollLeft + offsetX) / oldZoom;
+    const imageY = (shell.scrollTop + offsetY) / oldZoom;
+
+    state.zoom = newZoom;
+    applyZoom();
+
+    shell.scrollLeft = imageX * newZoom - offsetX;
+    shell.scrollTop = imageY * newZoom - offsetY;
+  }
+
+  function wheelZoom(event) {
+    if (!state.currentImage || !els.mainImage.naturalWidth) return;
+    event.preventDefault();
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    zoomAt(event.clientX, event.clientY, state.zoom * factor);
+  }
+
+  function startPan(event) {
+    if (event.button !== 0 || state.drag || !state.currentImage) return;
+    if (event.target.classList && event.target.classList.contains("handle")) return;
+    event.preventDefault();
+    state.pan = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      left: els.canvasShell.scrollLeft,
+      top: els.canvasShell.scrollTop,
+      moved: false
+    };
+    els.canvasShell.classList.add("is-panning");
+    els.canvasShell.setPointerCapture(event.pointerId);
+  }
+
+  function movePan(event) {
+    if (!state.pan) return;
+    const dx = event.clientX - state.pan.x;
+    const dy = event.clientY - state.pan.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) {
+      state.pan.moved = true;
+      state.suppressNextClick = true;
+    }
+    els.canvasShell.scrollLeft = state.pan.left - dx;
+    els.canvasShell.scrollTop = state.pan.top - dy;
+  }
+
+  function endPan() {
+    if (!state.pan) return;
+    state.pan = null;
+    els.canvasShell.classList.remove("is-panning");
+    window.setTimeout(() => {
+      state.suppressNextClick = false;
+    }, 0);
   }
 
   function fitImage() {
@@ -466,20 +536,37 @@
   });
   els.fitBtn.addEventListener("click", fitImage);
   els.zoomOutBtn.addEventListener("click", () => {
-    state.zoom -= 0.1;
-    applyZoom();
+    zoomAt(
+      els.canvasShell.getBoundingClientRect().left + els.canvasShell.clientWidth / 2,
+      els.canvasShell.getBoundingClientRect().top + els.canvasShell.clientHeight / 2,
+      state.zoom - 0.1
+    );
   });
   els.zoomInBtn.addEventListener("click", () => {
-    state.zoom += 0.1;
-    applyZoom();
+    zoomAt(
+      els.canvasShell.getBoundingClientRect().left + els.canvasShell.clientWidth / 2,
+      els.canvasShell.getBoundingClientRect().top + els.canvasShell.clientHeight / 2,
+      state.zoom + 0.1
+    );
   });
   els.addObjectBtn.addEventListener("click", addObject);
   els.deleteObjectBtn.addEventListener("click", deleteObject);
   els.applyObjectBtn.addEventListener("click", applyEditor);
   els.labelsEditor.addEventListener("change", applyEditor);
+  els.canvasShell.addEventListener("wheel", wheelZoom, { passive: false });
+  els.canvasShell.addEventListener("pointerdown", startPan);
+  els.canvasShell.addEventListener("pointermove", movePan);
+  els.canvasShell.addEventListener("pointerup", endPan);
+  els.canvasShell.addEventListener("pointercancel", endPan);
   els.overlay.addEventListener("pointermove", moveDrag);
   els.overlay.addEventListener("pointerup", endDrag);
   els.overlay.addEventListener("pointercancel", endDrag);
+  els.overlay.addEventListener("click", (event) => {
+    if (state.suppressNextClick) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
 
   renderAll();
 })();

@@ -295,10 +295,19 @@ textarea {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  cursor: grab;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #101418;
   box-shadow: var(--shadow);
+}
+
+.canvas-shell.is-panning {
+  cursor: grabbing;
+}
+
+.canvas-shell.is-panning * {
+  cursor: grabbing;
 }
 
 .stage {
