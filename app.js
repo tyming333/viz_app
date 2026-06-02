@@ -48,6 +48,7 @@
     pan: null,
     showBoxFill: true,
     boxStrokeWidth: 3,
+    viewFrame: 0,
     suppressNextClick: false
   };
 
@@ -206,6 +207,11 @@
     els.fillToggleBtn.setAttribute("aria-pressed", String(state.showBoxFill));
   }
 
+  function updateOverlayStyle() {
+    renderFillToggle();
+    updateOverlaySelection();
+  }
+
   function renderObjects() {
     const objects = getObjects(state.currentImage);
     els.objectCount.textContent = String(objects.length);
@@ -218,8 +224,7 @@
       button.textContent = `${index + 1}. ${label}`;
       button.title = button.textContent;
       button.addEventListener("click", () => {
-        state.selectedObjectIndex = index;
-        renderAll();
+        selectObject(index);
       });
       els.objectList.appendChild(button);
     });
@@ -251,6 +256,67 @@
     });
   }
 
+  function selectObject(index) {
+    state.selectedObjectIndex = index;
+    renderObjects();
+    renderEditor();
+    updateOverlaySelection();
+  }
+
+  function updateEditorBboxInputs() {
+    const obj = getObjects(state.currentImage)[state.selectedObjectIndex];
+    if (!obj) return;
+    const inputs = els.bboxGrid.querySelectorAll("input");
+    inputs.forEach((input, index) => {
+      input.value = obj.bbox[index];
+    });
+  }
+
+  function updateOverlaySelection() {
+    const groups = els.overlay.querySelectorAll("g[data-object-index]");
+    groups.forEach((group) => {
+      const index = Number(group.dataset.objectIndex);
+      const isActive = index === state.selectedObjectIndex;
+      const polygon = group.querySelector("[data-role='polygon']");
+      if (polygon) {
+        polygon.setAttribute("class", isActive ? "poly active" : "poly");
+        polygon.style.stroke = isActive ? "#facc15" : colors[index % colors.length];
+        polygon.style.strokeWidth = String(state.boxStrokeWidth);
+        polygon.style.fill = state.showBoxFill ? "" : "transparent";
+      }
+      group.querySelectorAll("[data-role='handle']").forEach((handle) => {
+        handle.style.display = isActive ? "block" : "none";
+      });
+    });
+  }
+
+  function updateOverlayObject(index) {
+    const obj = getObjects(state.currentImage)[index];
+    const group = els.overlay.querySelector(`g[data-object-index="${index}"]`);
+    if (!obj || !group) return;
+
+    const points = bboxToPoints(obj.bbox);
+    const polygon = group.querySelector("[data-role='polygon']");
+    if (polygon) {
+      polygon.setAttribute("points", points.map((p) => p.join(",")).join(" "));
+    }
+
+    const text = group.querySelector("[data-role='label']");
+    if (text) {
+      const minX = Math.min(points[0][0], points[1][0], points[2][0], points[3][0]);
+      const minY = Math.min(points[0][1], points[1][1], points[2][1], points[3][1]);
+      text.setAttribute("x", String(minX));
+      text.setAttribute("y", String(Math.max(16, minY - 8)));
+    }
+
+    group.querySelectorAll("[data-role='handle']").forEach((handle) => {
+      const pointIndex = Number(handle.dataset.pointIndex);
+      const point = points[pointIndex];
+      handle.setAttribute("cx", String(point[0]));
+      handle.setAttribute("cy", String(point[1]));
+    });
+  }
+
   function bboxToPoints(bbox) {
     return [
       [bbox[0], bbox[1]],
@@ -274,19 +340,21 @@
 
     if (!state.currentImage || !width || !height) return;
 
+    const fragment = document.createDocumentFragment();
     objects.forEach((obj, index) => {
       const points = bboxToPoints(obj.bbox);
       const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      group.dataset.objectIndex = String(index);
       const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
       const color = colors[index % colors.length];
       polygon.setAttribute("points", points.map((p) => p.join(",")).join(" "));
       polygon.setAttribute("class", index === state.selectedObjectIndex ? "poly active" : "poly");
+      polygon.dataset.role = "polygon";
       polygon.style.stroke = index === state.selectedObjectIndex ? "#facc15" : color;
       polygon.style.strokeWidth = String(state.boxStrokeWidth);
       polygon.style.fill = state.showBoxFill ? "" : "transparent";
       polygon.addEventListener("click", () => {
-        state.selectedObjectIndex = index;
-        renderAll();
+        selectObject(index);
       });
       group.appendChild(polygon);
 
@@ -297,6 +365,7 @@
       text.setAttribute("x", String(minX));
       text.setAttribute("y", String(Math.max(16, minY - 8)));
       text.setAttribute("class", "box-label");
+      text.dataset.role = "label";
       text.textContent = labelText;
       group.appendChild(text);
 
@@ -306,37 +375,40 @@
         handle.setAttribute("cy", String(point[1]));
         handle.setAttribute("r", "6");
         handle.setAttribute("class", "handle");
+        handle.dataset.role = "handle";
+        handle.dataset.pointIndex = String(pointIndex);
         handle.style.display = index === state.selectedObjectIndex ? "block" : "none";
         handle.addEventListener("pointerdown", (event) => startDrag(event, index, pointIndex));
         group.appendChild(handle);
       });
 
-      els.overlay.appendChild(group);
+      fragment.appendChild(group);
     });
+    els.overlay.appendChild(fragment);
   }
 
   function startDrag(event, objectIndex, pointIndex) {
     event.preventDefault();
     event.stopPropagation();
-    state.selectedObjectIndex = objectIndex;
+    if (state.selectedObjectIndex !== objectIndex) {
+      selectObject(objectIndex);
+    }
     state.drag = { objectIndex, pointIndex };
     els.overlay.setPointerCapture(event.pointerId);
-    renderAll();
   }
 
   function moveDrag(event) {
     if (!state.drag) return;
     const obj = getObjects(state.currentImage)[state.drag.objectIndex];
     if (!obj) return;
-    const rect = els.overlay.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / state.zoom;
-    const y = (event.clientY - rect.top) / state.zoom;
+    const rect = els.canvasShell.getBoundingClientRect();
+    const x = (event.clientX - rect.left - state.panX) / state.zoom;
+    const y = (event.clientY - rect.top - state.panY) / state.zoom;
     const base = state.drag.pointIndex * 2;
     obj.bbox[base] = Math.round(x);
     obj.bbox[base + 1] = Math.round(y);
-    renderObjects();
-    renderEditor();
-    renderOverlay();
+    updateOverlayObject(state.drag.objectIndex);
+    updateEditorBboxInputs();
   }
 
   function endDrag() {
@@ -397,6 +469,14 @@
 
   function applyZoom() {
     state.zoom = clampZoom(state.zoom);
+    if (state.viewFrame) return;
+    state.viewFrame = window.requestAnimationFrame(() => {
+      state.viewFrame = 0;
+      applyViewTransform();
+    });
+  }
+
+  function applyViewTransform() {
     els.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
     els.zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
   }
@@ -471,7 +551,11 @@
       state.zoom = 1;
       state.panX = 0;
       state.panY = 0;
-      applyZoom();
+      if (state.viewFrame) {
+        window.cancelAnimationFrame(state.viewFrame);
+        state.viewFrame = 0;
+      }
+      applyViewTransform();
       return;
     }
     const availableWidth = els.canvasShell.clientWidth - 24;
@@ -479,7 +563,11 @@
     state.zoom = Math.min(1, availableWidth / width, availableHeight / height);
     state.panX = Math.round((els.canvasShell.clientWidth - width * state.zoom) / 2);
     state.panY = Math.round((els.canvasShell.clientHeight - height * state.zoom) / 2);
-    applyZoom();
+    if (state.viewFrame) {
+      window.cancelAnimationFrame(state.viewFrame);
+      state.viewFrame = 0;
+    }
+    applyViewTransform();
   }
 
   function exportText() {
@@ -557,11 +645,11 @@
   els.resetViewBtn.addEventListener("click", resetView);
   els.fillToggleBtn.addEventListener("click", () => {
     state.showBoxFill = !state.showBoxFill;
-    renderAll();
+    updateOverlayStyle();
   });
   els.strokeWidthSelect.addEventListener("change", (event) => {
     state.boxStrokeWidth = Number(event.target.value) || 3;
-    renderOverlay();
+    updateOverlayStyle();
   });
   els.zoomOutBtn.addEventListener("click", () => {
     zoomAt(
