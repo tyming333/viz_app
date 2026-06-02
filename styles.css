@@ -290,6 +290,19 @@ textarea {
   font-size: 12px;
 }
 
+.toolbar-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.toolbar-select select {
+  width: 58px;
+  height: 34px;
+}
+
 .toolbar-actions button.active {
   border-color: var(--accent);
   background: #e7f7f4;
@@ -340,8 +353,6 @@ textarea {
 .poly {
   fill: rgba(37, 99, 235, 0.14);
   stroke: #4ade80;
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
   cursor: pointer;
 }
 

@@ -22,6 +22,7 @@
     emptyState: document.getElementById("emptyState"),
     resetViewBtn: document.getElementById("resetViewBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
+    strokeWidthSelect: document.getElementById("strokeWidthSelect"),
     zoomOutBtn: document.getElementById("zoomOutBtn"),
     zoomInBtn: document.getElementById("zoomInBtn"),
     zoomText: document.getElementById("zoomText"),
@@ -46,6 +47,7 @@
     drag: null,
     pan: null,
     showBoxFill: true,
+    boxStrokeWidth: 3,
     suppressNextClick: false
   };
 
@@ -280,6 +282,7 @@
       polygon.setAttribute("points", points.map((p) => p.join(",")).join(" "));
       polygon.setAttribute("class", index === state.selectedObjectIndex ? "poly active" : "poly");
       polygon.style.stroke = index === state.selectedObjectIndex ? "#facc15" : color;
+      polygon.style.strokeWidth = String(state.boxStrokeWidth);
       polygon.style.fill = state.showBoxFill ? "" : "transparent";
       polygon.addEventListener("click", () => {
         state.selectedObjectIndex = index;
@@ -555,6 +558,10 @@
   els.fillToggleBtn.addEventListener("click", () => {
     state.showBoxFill = !state.showBoxFill;
     renderAll();
+  });
+  els.strokeWidthSelect.addEventListener("change", (event) => {
+    state.boxStrokeWidth = Number(event.target.value) || 3;
+    renderOverlay();
   });
   els.zoomOutBtn.addEventListener("click", () => {
     zoomAt(
