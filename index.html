@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DET Objects 可视化</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>DET Objects 可视化</h1>
+        <p>只支持 <code>det.objects[*].bbox</code> 的四点八绝对坐标格式</p>
+      </div>
+      <div class="actions">
+        <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
+        <button id="downloadJsonBtn" type="button" title="导出当前 JSON">导出 JSON</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel">
+          <label class="field">
+            <span>图片 prefix</span>
+            <input id="prefixInput" type="text" placeholder="例如：D:/dataset/images/" />
+          </label>
+          <label class="field">
+            <span>导入 JSON 文件</span>
+            <input id="jsonFileInput" type="file" accept=".json,application/json" />
+          </label>
+          <label class="field fill">
+            <span>JSON 文本</span>
+            <textarea id="jsonInput" spellcheck="false" placeholder='{"image.jpg":{"det":{"objects":[{"labels":["类别"],"bbox":[10,10,100,10,100,80,10,80],"attrs":{}}]}}}'></textarea>
+          </label>
+          <div class="row">
+            <button id="loadBtn" type="button">加载数据</button>
+            <button id="formatBtn" type="button">格式化</button>
+          </div>
+          <div class="progress" aria-hidden="true">
+            <div id="progressBar"></div>
+          </div>
+          <p id="statusText" class="status">等待输入</p>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-title">
+            <strong>图片</strong>
+            <span id="imageCount">0</span>
+          </div>
+          <input id="imageFilter" type="search" placeholder="筛选图片名" />
+          <div id="imageList" class="list"></div>
+        </section>
+      </aside>
+
+      <section class="viewer">
+        <div class="viewer-toolbar">
+          <div class="select-wrap">
+            <span>当前图片</span>
+            <select id="imageSelect"></select>
+          </div>
+          <div class="toolbar-actions">
+            <button id="fitBtn" type="button">适应</button>
+            <button id="zoomOutBtn" type="button">-</button>
+            <output id="zoomText">100%</output>
+            <button id="zoomInBtn" type="button">+</button>
+          </div>
+        </div>
+
+        <div id="canvasShell" class="canvas-shell">
+          <div id="stage" class="stage">
+            <img id="mainImage" alt="" />
+            <svg id="overlay" aria-label="objects overlay"></svg>
+          </div>
+          <div id="emptyState" class="empty-state">
+            <strong>未加载数据</strong>
+            <span>输入 prefix 和 JSON 后开始查看 objects 框</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="inspector">
+        <section class="panel">
+          <div class="panel-title">
+            <strong>Objects</strong>
+            <span id="objectCount">0</span>
+          </div>
+          <div class="row">
+            <button id="addObjectBtn" type="button">新增框</button>
+            <button id="deleteObjectBtn" type="button">删除选中</button>
+          </div>
+          <div id="objectList" class="object-list"></div>
+        </section>
+
+        <section class="panel editor-panel">
+          <div class="panel-title">
+            <strong>编辑</strong>
+            <span id="selectedBadge">未选中</span>
+          </div>
+          <label class="field">
+            <span>labels，每行一个</span>
+            <textarea id="labelsEditor" spellcheck="false"></textarea>
+          </label>
+          <div class="bbox-grid" id="bboxGrid"></div>
+          <button id="applyObjectBtn" type="button">应用修改</button>
+        </section>
+      </aside>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
