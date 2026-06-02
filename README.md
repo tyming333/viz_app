@@ -1,4 +1,4 @@
-# DET Objects 可视化工具
+# TY可视化工具
 
 打开 `index.html` 即可使用。
 

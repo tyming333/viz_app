@@ -392,6 +392,22 @@ textarea {
   font-size: 13px;
 }
 
+.ming-badge {
+  position: fixed;
+  left: 12px;
+  bottom: 10px;
+  z-index: 20;
+  border: 1px solid rgba(15, 118, 110, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--accent);
+  box-shadow: 0 6px 18px rgba(22, 34, 51, 0.12);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .bbox-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
