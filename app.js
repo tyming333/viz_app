@@ -23,6 +23,7 @@
     resetViewBtn: document.getElementById("resetViewBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
     strokeWidthSelect: document.getElementById("strokeWidthSelect"),
+    labelSizeSelect: document.getElementById("labelSizeSelect"),
     zoomOutBtn: document.getElementById("zoomOutBtn"),
     zoomInBtn: document.getElementById("zoomInBtn"),
     zoomText: document.getElementById("zoomText"),
@@ -48,6 +49,7 @@
     pan: null,
     showBoxFill: true,
     boxStrokeWidth: 3,
+    labelFontSize: 15,
     viewFrame: 0,
     suppressNextClick: false
   };
@@ -220,6 +222,7 @@
       const button = document.createElement("button");
       button.type = "button";
       button.className = index === state.selectedObjectIndex ? "active" : "";
+      button.dataset.objectIndex = String(index);
       const label = Array.isArray(obj.labels) && obj.labels.length ? obj.labels.join(" / ") : "未命名";
       button.textContent = `${index + 1}. ${label}`;
       button.title = button.textContent;
@@ -261,6 +264,13 @@
     renderObjects();
     renderEditor();
     updateOverlaySelection();
+    scrollSelectedObjectIntoView();
+  }
+
+  function scrollSelectedObjectIntoView() {
+    const button = els.objectList.querySelector(`button[data-object-index="${state.selectedObjectIndex}"]`);
+    if (!button) return;
+    button.scrollIntoView({ block: "nearest" });
   }
 
   function updateEditorBboxInputs() {
@@ -283,6 +293,11 @@
         polygon.style.stroke = isActive ? "#facc15" : colors[index % colors.length];
         polygon.style.strokeWidth = String(state.boxStrokeWidth);
         polygon.style.fill = state.showBoxFill ? "" : "transparent";
+      }
+      const text = group.querySelector("[data-role='label']");
+      if (text) {
+        text.style.fontSize = `${state.labelFontSize}px`;
+        text.style.strokeWidth = `${Math.max(2, state.labelFontSize * 0.27)}px`;
       }
       group.querySelectorAll("[data-role='handle']").forEach((handle) => {
         handle.style.display = isActive ? "block" : "none";
@@ -366,6 +381,8 @@
       text.setAttribute("y", String(Math.max(16, minY - 8)));
       text.setAttribute("class", "box-label");
       text.dataset.role = "label";
+      text.style.fontSize = `${state.labelFontSize}px`;
+      text.style.strokeWidth = `${Math.max(2, state.labelFontSize * 0.27)}px`;
       text.textContent = labelText;
       group.appendChild(text);
 
@@ -649,6 +666,10 @@
   });
   els.strokeWidthSelect.addEventListener("change", (event) => {
     state.boxStrokeWidth = Number(event.target.value) || 3;
+    updateOverlayStyle();
+  });
+  els.labelSizeSelect.addEventListener("change", (event) => {
+    state.labelFontSize = Number(event.target.value) || 15;
     updateOverlayStyle();
   });
   els.zoomOutBtn.addEventListener("click", () => {

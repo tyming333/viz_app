@@ -372,9 +372,7 @@ textarea {
 .box-label {
   paint-order: stroke;
   stroke: rgba(0, 0, 0, 0.8);
-  stroke-width: 4px;
   fill: white;
-  font-size: 15px;
   font-weight: 700;
   pointer-events: none;
 }
