@@ -46,6 +46,7 @@
     data: null,
     imageNames: [],
     currentImage: "",
+    currentImageIndex: -1,
     selectedObjectIndex: -1,
     zoom: 1,
     panX: 0,
@@ -62,6 +63,10 @@
 
   const colors = ["#4ade80", "#38bdf8", "#facc15", "#fb7185", "#a78bfa", "#2dd4bf"];
   const pointNames = ["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4"];
+  const imageButtons = new Map();
+  const imageNameToIndex = new Map();
+  let activeImageButton = null;
+  let activeObjectButton = null;
 
   function setProgress(percent) {
     els.progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
@@ -143,19 +148,22 @@
       const result = validateData(parsed);
       state.data = parsed;
       state.imageNames = result.names;
-      state.currentImage = state.imageNames[0] || "";
+      const firstImage = state.imageNames[0] || "";
+      state.currentImage = "";
+      state.currentImageIndex = -1;
       state.selectedObjectIndex = -1;
       setStatus(`已加载 ${state.imageNames.length} 张图片，${result.objectTotal} 个 objects`, 55);
       renderImageControls();
-      selectImage(state.currentImage);
+      selectImage(firstImage);
       setStatus(`已加载 ${state.imageNames.length} 张图片，${result.objectTotal} 个 objects`, 100);
     } catch (err) {
       state.data = null;
       state.imageNames = [];
       state.currentImage = "";
+      state.currentImageIndex = -1;
       state.selectedObjectIndex = -1;
       setStatus(`加载失败：${err.message}`, 0);
-      renderAll();
+      renderFull();
     }
   }
 
@@ -165,28 +173,51 @@
 
     els.imageCount.textContent = String(state.imageNames.length);
     els.imageSelect.innerHTML = "";
-    state.imageNames.forEach((name) => {
+    imageButtons.clear();
+    imageNameToIndex.clear();
+    activeImageButton = null;
+    const optionsFragment = document.createDocumentFragment();
+    state.imageNames.forEach((name, index) => {
+      imageNameToIndex.set(name, index);
       const option = document.createElement("option");
       option.value = name;
       option.textContent = name;
-      els.imageSelect.appendChild(option);
+      optionsFragment.appendChild(option);
     });
-    els.imageSelect.value = state.currentImage;
+    els.imageSelect.replaceChildren(optionsFragment);
 
-    els.imageList.innerHTML = "";
+    const listFragment = document.createDocumentFragment();
     visibleNames.forEach((name) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = name === state.currentImage ? "active" : "";
+      button.dataset.imageName = name;
       button.textContent = name;
       button.title = name;
-      button.addEventListener("click", () => selectImage(name));
-      els.imageList.appendChild(button);
+      imageButtons.set(name, button);
+      if (name === state.currentImage) {
+        activeImageButton = button;
+      }
+      listFragment.appendChild(button);
     });
+    els.imageList.replaceChildren(listFragment);
+    updateImageSelection();
+  }
+
+  function updateImageSelection() {
+    els.imageSelect.selectedIndex = state.currentImageIndex;
+    if (activeImageButton) {
+      activeImageButton.classList.remove("active");
+    }
+    activeImageButton = imageButtons.get(state.currentImage) || null;
+    if (activeImageButton) {
+      activeImageButton.classList.add("active");
+    }
+    renderImageNavButtons();
   }
 
   function currentImageIndex() {
-    return state.imageNames.indexOf(state.currentImage);
+    return state.currentImageIndex;
   }
 
   function renderImageNavButtons() {
@@ -210,14 +241,22 @@
     const target = event.target;
     if (!target || !target.tagName) return false;
     if (target.isContentEditable) return true;
-    return ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName);
+    return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
   }
 
   function selectImage(name) {
-    state.currentImage = name || "";
+    const nextName = name || "";
+    if (nextName && nextName === state.currentImage) {
+      updateImageSelection();
+      return;
+    }
+    const nextIndex = nextName ? imageNameToIndex.get(nextName) : -1;
+    state.currentImage = nextName;
+    state.currentImageIndex = typeof nextIndex === "number" ? nextIndex : -1;
     state.selectedObjectIndex = -1;
+    updateImageSelection();
     if (state.currentImage) {
-      els.imageSelect.value = state.currentImage;
+      clearOverlay();
       els.mainImage.src = imageUrl(state.currentImage);
       els.mainImage.alt = state.currentImage;
       els.emptyState.style.display = "none";
@@ -225,12 +264,12 @@
     } else {
       els.mainImage.removeAttribute("src");
       els.emptyState.style.display = "grid";
+      clearOverlay();
     }
-    renderAll();
+    renderImageChrome();
   }
 
   function renderAll() {
-    renderImageControls();
     renderObjects();
     renderEditor();
     renderOverlay();
@@ -239,6 +278,28 @@
     renderFillToggle();
     renderSliderValues();
     applyZoom();
+  }
+
+  function renderImageChrome() {
+    renderObjects();
+    renderEditor();
+    renderImageNavButtons();
+    renderBoxVisibilityToggle();
+    renderFillToggle();
+    renderSliderValues();
+    applyZoom();
+  }
+
+  function renderFull() {
+    renderImageControls();
+    renderAll();
+  }
+
+  function clearOverlay() {
+    els.overlay.innerHTML = "";
+    els.overlay.setAttribute("width", "0");
+    els.overlay.setAttribute("height", "0");
+    els.overlay.setAttribute("viewBox", "0 0 1 1");
   }
 
   function formatSliderValue(value) {
@@ -282,7 +343,8 @@
   function renderObjects() {
     const objects = getObjects(state.currentImage);
     els.objectCount.textContent = String(objects.length);
-    els.objectList.innerHTML = "";
+    activeObjectButton = null;
+    const fragment = document.createDocumentFragment();
     objects.forEach((obj, index) => {
       const button = document.createElement("button");
       button.type = "button";
@@ -291,11 +353,22 @@
       const label = Array.isArray(obj.labels) && obj.labels.length ? obj.labels.join(" / ") : "未命名";
       button.textContent = `${index + 1}. ${label}`;
       button.title = button.textContent;
-      button.addEventListener("click", () => {
-        selectObject(index);
-      });
-      els.objectList.appendChild(button);
+      if (index === state.selectedObjectIndex) {
+        activeObjectButton = button;
+      }
+      fragment.appendChild(button);
     });
+    els.objectList.replaceChildren(fragment);
+  }
+
+  function updateObjectSelection() {
+    if (activeObjectButton) {
+      activeObjectButton.classList.remove("active");
+    }
+    activeObjectButton = els.objectList.querySelector(`button[data-object-index="${state.selectedObjectIndex}"]`);
+    if (activeObjectButton) {
+      activeObjectButton.classList.add("active");
+    }
   }
 
   function renderEditor() {
@@ -326,7 +399,7 @@
 
   function selectObject(index) {
     state.selectedObjectIndex = index;
-    renderObjects();
+    updateObjectSelection();
     renderEditor();
     updateOverlaySelection();
     scrollSelectedObjectIntoView();
@@ -592,6 +665,7 @@
   function startPan(event) {
     if (event.button !== 0 || state.drag || !state.currentImage) return;
     if (event.target.classList && event.target.classList.contains("handle")) return;
+    if (event.target.closest && event.target.closest("button, input, textarea, select")) return;
     event.preventDefault();
     state.pan = {
       pointerId: event.pointerId,
@@ -709,13 +783,24 @@
     reader.readAsText(file, "utf-8");
   }
 
+  function stopPointerBubble(event) {
+    event.stopPropagation();
+  }
+
   els.loadBtn.addEventListener("click", loadJson);
   els.formatBtn.addEventListener("click", formatJson);
   els.copyJsonBtn.addEventListener("click", copyJson);
   els.downloadJsonBtn.addEventListener("click", downloadJson);
   els.jsonFileInput.addEventListener("change", (event) => readJsonFile(event.target.files[0]));
   els.imageFilter.addEventListener("input", renderImageControls);
+  els.imageList.addEventListener("click", (event) => {
+    const button = event.target.closest ? event.target.closest("button[data-image-name]") : null;
+    if (!button || !els.imageList.contains(button)) return;
+    selectImage(button.dataset.imageName);
+  });
   els.imageSelect.addEventListener("change", (event) => selectImage(event.target.value));
+  els.prevImageBtn.addEventListener("pointerdown", stopPointerBubble);
+  els.nextImageBtn.addEventListener("pointerdown", stopPointerBubble);
   els.prevImageBtn.addEventListener("click", () => selectAdjacentImage(-1));
   els.nextImageBtn.addEventListener("click", () => selectAdjacentImage(1));
   els.mainImage.addEventListener("load", () => {
@@ -760,6 +845,11 @@
   });
   els.addObjectBtn.addEventListener("click", addObject);
   els.deleteObjectBtn.addEventListener("click", deleteObject);
+  els.objectList.addEventListener("click", (event) => {
+    const button = event.target.closest ? event.target.closest("button[data-object-index]") : null;
+    if (!button || !els.objectList.contains(button)) return;
+    selectObject(Number(button.dataset.objectIndex));
+  });
   els.applyObjectBtn.addEventListener("click", applyEditor);
   els.labelsEditor.addEventListener("change", applyEditor);
   els.canvasShell.addEventListener("wheel", wheelZoom, { passive: false });
@@ -788,5 +878,5 @@
     }
   });
 
-  renderAll();
+  renderFull();
 })();
