@@ -55,26 +55,26 @@ button:disabled {
 }
 
 .topbar {
-  height: 70px;
+  height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 0 18px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
 }
 
 .topbar h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.2;
 }
 
 .topbar p {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .actions,
@@ -83,6 +83,17 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.toolbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.toolbar-actions button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .actions button:last-child,
@@ -94,7 +105,7 @@ button:disabled {
 }
 
 .layout {
-  height: calc(100vh - 70px);
+  height: calc(100vh - 58px);
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(360px, 1fr) minmax(280px, 340px);
   gap: 12px;
@@ -142,10 +153,14 @@ button:disabled {
   margin-bottom: 10px;
 }
 
-.field span,
-.select-wrap span {
+.field span {
   color: var(--muted);
   font-size: 12px;
+}
+
+.image-picker span {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .field.fill {
@@ -262,32 +277,37 @@ textarea {
 }
 
 .viewer-toolbar {
-  min-height: 50px;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 10px;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
 }
 
-.select-wrap {
+.image-picker {
   min-width: 0;
-  flex: 1;
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 52px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.image-picker select {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 
 .toolbar-actions output {
-  min-width: 54px;
+  min-width: 46px;
   text-align: center;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .toolbar-select {
@@ -301,6 +321,28 @@ textarea {
 .toolbar-select select {
   width: 58px;
   height: 34px;
+}
+
+.toolbar-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.toolbar-slider input[type="range"] {
+  width: 82px;
+  height: 18px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.toolbar-slider output {
+  min-width: 30px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .toolbar-actions button.active {
@@ -348,6 +390,50 @@ textarea {
   position: absolute;
   inset: 0;
   overflow: visible;
+}
+
+.image-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 6;
+  width: 38px;
+  min-height: 72px;
+  padding: 0;
+  transform: translateY(-50%);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(16, 20, 24, 0.62);
+  color: #ffffff;
+  font-size: 30px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.image-nav-prev {
+  left: 10px;
+}
+
+.image-nav-next {
+  right: 10px;
+}
+
+.canvas-shell:hover .image-nav,
+.canvas-shell:focus-within .image-nav {
+  opacity: 0.86;
+  pointer-events: auto;
+}
+
+.image-nav:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(16, 20, 24, 0.82);
+  opacity: 1;
+}
+
+.canvas-shell:hover .image-nav:disabled,
+.canvas-shell:focus-within .image-nav:disabled {
+  opacity: 0.25;
+  pointer-events: none;
 }
 
 .poly {
@@ -424,7 +510,7 @@ textarea {
 @media (max-width: 1100px) {
   .layout {
     height: auto;
-    min-height: calc(100vh - 70px);
+    min-height: calc(100vh - 58px);
     grid-template-columns: 1fr;
   }
 

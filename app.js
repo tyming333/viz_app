@@ -20,10 +20,15 @@
     mainImage: document.getElementById("mainImage"),
     overlay: document.getElementById("overlay"),
     emptyState: document.getElementById("emptyState"),
+    prevImageBtn: document.getElementById("prevImageBtn"),
+    nextImageBtn: document.getElementById("nextImageBtn"),
     resetViewBtn: document.getElementById("resetViewBtn"),
+    boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
-    strokeWidthSelect: document.getElementById("strokeWidthSelect"),
-    labelSizeSelect: document.getElementById("labelSizeSelect"),
+    strokeWidthRange: document.getElementById("strokeWidthRange"),
+    strokeWidthText: document.getElementById("strokeWidthText"),
+    labelSizeRange: document.getElementById("labelSizeRange"),
+    labelSizeText: document.getElementById("labelSizeText"),
     zoomOutBtn: document.getElementById("zoomOutBtn"),
     zoomInBtn: document.getElementById("zoomInBtn"),
     zoomText: document.getElementById("zoomText"),
@@ -47,9 +52,10 @@
     panY: 0,
     drag: null,
     pan: null,
+    showBoxes: true,
     showBoxFill: true,
     boxStrokeWidth: 3,
-    labelFontSize: 15,
+    labelFontSize: 13,
     viewFrame: 0,
     suppressNextClick: false
   };
@@ -179,6 +185,34 @@
     });
   }
 
+  function currentImageIndex() {
+    return state.imageNames.indexOf(state.currentImage);
+  }
+
+  function renderImageNavButtons() {
+    const index = currentImageIndex();
+    const hasImage = index >= 0;
+    els.prevImageBtn.hidden = !hasImage;
+    els.nextImageBtn.hidden = !hasImage;
+    els.prevImageBtn.disabled = !hasImage || index <= 0;
+    els.nextImageBtn.disabled = !hasImage || index >= state.imageNames.length - 1;
+  }
+
+  function selectAdjacentImage(step) {
+    const index = currentImageIndex();
+    if (index < 0) return;
+    const nextIndex = Math.max(0, Math.min(state.imageNames.length - 1, index + step));
+    if (nextIndex === index) return;
+    selectImage(state.imageNames[nextIndex]);
+  }
+
+  function shouldIgnoreImageShortcut(event) {
+    const target = event.target;
+    if (!target || !target.tagName) return false;
+    if (target.isContentEditable) return true;
+    return ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName);
+  }
+
   function selectImage(name) {
     state.currentImage = name || "";
     state.selectedObjectIndex = -1;
@@ -200,8 +234,37 @@
     renderObjects();
     renderEditor();
     renderOverlay();
+    renderImageNavButtons();
+    renderBoxVisibilityToggle();
     renderFillToggle();
+    renderSliderValues();
     applyZoom();
+  }
+
+  function formatSliderValue(value) {
+    return Number.isInteger(value) ? String(value) : String(value.toFixed(1));
+  }
+
+  function getRenderedLabelFontSize() {
+    return Math.max(8, Math.min(28, state.labelFontSize));
+  }
+
+  function getRenderedLabelStrokeWidth() {
+    return Math.max(1.5, Math.min(5, getRenderedLabelFontSize() * 0.22));
+  }
+
+  function renderSliderValues() {
+    els.strokeWidthRange.value = String(state.boxStrokeWidth);
+    els.strokeWidthText.textContent = formatSliderValue(state.boxStrokeWidth);
+    els.labelSizeRange.value = String(state.labelFontSize);
+    els.labelSizeText.textContent = String(state.labelFontSize);
+  }
+
+  function renderBoxVisibilityToggle() {
+    els.boxVisibilityBtn.classList.toggle("active", state.showBoxes);
+    els.boxVisibilityBtn.setAttribute("aria-pressed", String(state.showBoxes));
+    els.boxVisibilityBtn.title = state.showBoxes ? "隐藏所有框" : "显示所有框";
+    els.overlay.style.display = state.showBoxes ? "" : "none";
   }
 
   function renderFillToggle() {
@@ -210,7 +273,9 @@
   }
 
   function updateOverlayStyle() {
+    renderBoxVisibilityToggle();
     renderFillToggle();
+    renderSliderValues();
     updateOverlaySelection();
   }
 
@@ -296,8 +361,8 @@
       }
       const text = group.querySelector("[data-role='label']");
       if (text) {
-        text.style.fontSize = `${state.labelFontSize}px`;
-        text.style.strokeWidth = `${Math.max(2, state.labelFontSize * 0.27)}px`;
+        text.style.fontSize = `${getRenderedLabelFontSize()}px`;
+        text.style.strokeWidth = `${getRenderedLabelStrokeWidth()}px`;
       }
       group.querySelectorAll("[data-role='handle']").forEach((handle) => {
         handle.style.display = isActive ? "block" : "none";
@@ -382,8 +447,8 @@
       text.setAttribute("y", String(Math.max(16, minY - 8)));
       text.setAttribute("class", "box-label");
       text.dataset.role = "label";
-      text.style.fontSize = `${state.labelFontSize}px`;
-      text.style.strokeWidth = `${Math.max(2, state.labelFontSize * 0.27)}px`;
+      text.style.fontSize = `${getRenderedLabelFontSize()}px`;
+      text.style.strokeWidth = `${getRenderedLabelStrokeWidth()}px`;
       text.textContent = labelText;
       group.appendChild(text);
 
@@ -651,6 +716,8 @@
   els.jsonFileInput.addEventListener("change", (event) => readJsonFile(event.target.files[0]));
   els.imageFilter.addEventListener("input", renderImageControls);
   els.imageSelect.addEventListener("change", (event) => selectImage(event.target.value));
+  els.prevImageBtn.addEventListener("click", () => selectAdjacentImage(-1));
+  els.nextImageBtn.addEventListener("click", () => selectAdjacentImage(1));
   els.mainImage.addEventListener("load", () => {
     resetView();
     renderAll();
@@ -661,16 +728,20 @@
     setStatus(`图片加载失败，请检查 prefix：${state.currentImage}`, 0);
   });
   els.resetViewBtn.addEventListener("click", resetView);
+  els.boxVisibilityBtn.addEventListener("click", () => {
+    state.showBoxes = !state.showBoxes;
+    updateOverlayStyle();
+  });
   els.fillToggleBtn.addEventListener("click", () => {
     state.showBoxFill = !state.showBoxFill;
     updateOverlayStyle();
   });
-  els.strokeWidthSelect.addEventListener("change", (event) => {
+  els.strokeWidthRange.addEventListener("input", (event) => {
     state.boxStrokeWidth = Number(event.target.value) || 3;
     updateOverlayStyle();
   });
-  els.labelSizeSelect.addEventListener("change", (event) => {
-    state.labelFontSize = Number(event.target.value) || 15;
+  els.labelSizeRange.addEventListener("input", (event) => {
+    state.labelFontSize = Number(event.target.value) || 13;
     updateOverlayStyle();
   });
   els.zoomOutBtn.addEventListener("click", () => {
@@ -705,6 +776,17 @@
       event.stopPropagation();
     }
   }, true);
+  document.addEventListener("keydown", (event) => {
+    if (shouldIgnoreImageShortcut(event)) return;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      selectAdjacentImage(-1);
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      selectAdjacentImage(1);
+    }
+  });
 
   renderAll();
 })();
