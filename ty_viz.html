@@ -57,7 +57,10 @@
         <div class="viewer-toolbar">
           <label class="image-picker">
             <span>当前图片</span>
-            <select id="imageSelect"></select>
+            <div class="image-picker-controls">
+              <input id="currentImageText" type="text" readonly value="" title="可选中复制当前图片名" />
+              <select id="imageSelect" title="切换当前图片"></select>
+            </div>
           </label>
           <div class="toolbar-actions">
             <button id="resetViewBtn" type="button">复位</button>

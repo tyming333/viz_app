@@ -14,6 +14,7 @@
     imageCount: document.getElementById("imageCount"),
     imageFilter: document.getElementById("imageFilter"),
     imageList: document.getElementById("imageList"),
+    currentImageText: document.getElementById("currentImageText"),
     imageSelect: document.getElementById("imageSelect"),
     canvasShell: document.getElementById("canvasShell"),
     stage: document.getElementById("stage"),
@@ -58,6 +59,10 @@
     boxStrokeWidth: 3,
     labelFontSize: 13,
     viewFrame: 0,
+    detailFrame: 0,
+    overlayFrame: 0,
+    overlayResumeTimer: 0,
+    renderVersion: 0,
     suppressNextClick: false
   };
 
@@ -65,6 +70,7 @@
   const pointNames = ["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4"];
   const imageButtons = new Map();
   const imageNameToIndex = new Map();
+  const preloadImages = new Map();
   let activeImageButton = null;
   let activeObjectButton = null;
 
@@ -148,6 +154,7 @@
       const result = validateData(parsed);
       state.data = parsed;
       state.imageNames = result.names;
+      preloadImages.clear();
       const firstImage = state.imageNames[0] || "";
       state.currentImage = "";
       state.currentImageIndex = -1;
@@ -159,6 +166,7 @@
     } catch (err) {
       state.data = null;
       state.imageNames = [];
+      preloadImages.clear();
       state.currentImage = "";
       state.currentImageIndex = -1;
       state.selectedObjectIndex = -1;
@@ -205,6 +213,8 @@
   }
 
   function updateImageSelection() {
+    els.currentImageText.value = state.currentImage;
+    els.currentImageText.title = state.currentImage || "可选中复制当前图片名";
     els.imageSelect.selectedIndex = state.currentImageIndex;
     if (activeImageButton) {
       activeImageButton.classList.remove("active");
@@ -250,6 +260,7 @@
       updateImageSelection();
       return;
     }
+    cancelDeferredRender();
     const nextIndex = nextName ? imageNameToIndex.get(nextName) : -1;
     state.currentImage = nextName;
     state.currentImageIndex = typeof nextIndex === "number" ? nextIndex : -1;
@@ -265,8 +276,10 @@
       els.mainImage.removeAttribute("src");
       els.emptyState.style.display = "grid";
       clearOverlay();
+      renderImageChrome();
+      return;
     }
-    renderImageChrome();
+    renderSwitchChrome();
   }
 
   function renderAll() {
@@ -277,6 +290,7 @@
     renderBoxVisibilityToggle();
     renderFillToggle();
     renderSliderValues();
+    applyOverlayCssVars();
     applyZoom();
   }
 
@@ -287,6 +301,16 @@
     renderBoxVisibilityToggle();
     renderFillToggle();
     renderSliderValues();
+    applyOverlayCssVars();
+    applyZoom();
+  }
+
+  function renderSwitchChrome() {
+    renderImageNavButtons();
+    renderBoxVisibilityToggle();
+    renderFillToggle();
+    renderSliderValues();
+    applyOverlayCssVars();
     applyZoom();
   }
 
@@ -302,6 +326,84 @@
     els.overlay.setAttribute("viewBox", "0 0 1 1");
   }
 
+  function cancelDeferredRender() {
+    state.renderVersion += 1;
+    if (state.detailFrame) {
+      window.cancelAnimationFrame(state.detailFrame);
+      window.clearTimeout(state.detailFrame);
+      state.detailFrame = 0;
+    }
+    if (state.overlayFrame) {
+      window.cancelAnimationFrame(state.overlayFrame);
+      window.clearTimeout(state.overlayFrame);
+      state.overlayFrame = 0;
+    }
+  }
+
+  function renderImageDetailsDeferred() {
+    const version = state.renderVersion;
+    state.detailFrame = window.setTimeout(() => {
+      state.detailFrame = 0;
+      if (version !== state.renderVersion) return;
+      renderObjects();
+      renderEditor();
+      renderImageNavButtons();
+      renderBoxVisibilityToggle();
+      renderFillToggle();
+      renderSliderValues();
+      applyOverlayCssVars();
+
+      state.overlayFrame = window.setTimeout(() => {
+        state.overlayFrame = 0;
+        if (version !== state.renderVersion) return;
+        renderOverlay();
+        applyZoom();
+      }, 80);
+    }, 60);
+  }
+
+  function preloadAdjacentImages() {
+    const index = currentImageIndex();
+    if (index < 0) return;
+    [index - 3, index - 2, index - 1, index + 1, index + 2, index + 3].forEach((nextIndex) => {
+      const name = state.imageNames[nextIndex];
+      if (!name || preloadImages.has(name)) return;
+      const image = new Image();
+      const entry = { image, decoded: false };
+      preloadImages.set(name, entry);
+      image.onload = () => {
+        if (!image.decode) {
+          entry.decoded = true;
+          return;
+        }
+        image.decode()
+          .then(() => {
+            entry.decoded = true;
+          })
+          .catch(() => {
+            entry.decoded = true;
+          });
+      };
+      image.src = imageUrl(name);
+    });
+    trimPreloadCache();
+  }
+
+  function trimPreloadCache() {
+    const index = currentImageIndex();
+    if (index < 0 || preloadImages.size <= 12) return;
+    const keep = new Set();
+    for (let offset = -4; offset <= 4; offset += 1) {
+      const name = state.imageNames[index + offset];
+      if (name) keep.add(name);
+    }
+    preloadImages.forEach((entry, name) => {
+      if (!keep.has(name)) {
+        preloadImages.delete(name);
+      }
+    });
+  }
+
   function formatSliderValue(value) {
     return Number.isInteger(value) ? String(value) : String(value.toFixed(1));
   }
@@ -312,6 +414,17 @@
 
   function getRenderedLabelStrokeWidth() {
     return Math.max(1.5, Math.min(5, getRenderedLabelFontSize() * 0.22));
+  }
+
+  function getOverlayScale() {
+    return Math.max(0.1, state.zoom || 1);
+  }
+
+  function applyOverlayCssVars() {
+    const scale = getOverlayScale();
+    els.overlay.style.setProperty("--box-stroke-width", String(state.boxStrokeWidth));
+    els.overlay.style.setProperty("--label-font-size", `${getRenderedLabelFontSize() / scale}px`);
+    els.overlay.style.setProperty("--label-stroke-width", `${getRenderedLabelStrokeWidth() / scale}px`);
   }
 
   function renderSliderValues() {
@@ -337,7 +450,13 @@
     renderBoxVisibilityToggle();
     renderFillToggle();
     renderSliderValues();
+    applyOverlayCssVars();
     updateOverlaySelection();
+  }
+
+  function updateOverlayMetrics() {
+    renderSliderValues();
+    applyOverlayCssVars();
   }
 
   function renderObjects() {
@@ -429,18 +548,10 @@
       if (polygon) {
         polygon.setAttribute("class", isActive ? "poly active" : "poly");
         polygon.style.stroke = isActive ? "#facc15" : colors[index % colors.length];
-        polygon.style.strokeWidth = String(state.boxStrokeWidth);
         polygon.style.fill = state.showBoxFill ? "" : "transparent";
       }
-      const text = group.querySelector("[data-role='label']");
-      if (text) {
-        text.style.fontSize = `${getRenderedLabelFontSize()}px`;
-        text.style.strokeWidth = `${getRenderedLabelStrokeWidth()}px`;
-      }
-      group.querySelectorAll("[data-role='handle']").forEach((handle) => {
-        handle.style.display = isActive ? "block" : "none";
-      });
     });
+    renderHandles();
   }
 
   function updateOverlayObject(index) {
@@ -462,12 +573,7 @@
       text.setAttribute("y", String(Math.max(16, minY - 8)));
     }
 
-    group.querySelectorAll("[data-role='handle']").forEach((handle) => {
-      const pointIndex = Number(handle.dataset.pointIndex);
-      const point = points[pointIndex];
-      handle.setAttribute("cx", String(point[0]));
-      handle.setAttribute("cy", String(point[1]));
-    });
+    updateSelectedHandles(index);
   }
 
   function bboxToPoints(bbox) {
@@ -504,7 +610,6 @@
       polygon.setAttribute("class", index === state.selectedObjectIndex ? "poly active" : "poly");
       polygon.dataset.role = "polygon";
       polygon.style.stroke = index === state.selectedObjectIndex ? "#facc15" : color;
-      polygon.style.strokeWidth = String(state.boxStrokeWidth);
       polygon.style.fill = state.showBoxFill ? "" : "transparent";
       polygon.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
@@ -520,27 +625,58 @@
       text.setAttribute("y", String(Math.max(16, minY - 8)));
       text.setAttribute("class", "box-label");
       text.dataset.role = "label";
-      text.style.fontSize = `${getRenderedLabelFontSize()}px`;
-      text.style.strokeWidth = `${getRenderedLabelStrokeWidth()}px`;
       text.textContent = labelText;
       group.appendChild(text);
-
-      points.forEach((point, pointIndex) => {
-        const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        handle.setAttribute("cx", String(point[0]));
-        handle.setAttribute("cy", String(point[1]));
-        handle.setAttribute("r", "6");
-        handle.setAttribute("class", "handle");
-        handle.dataset.role = "handle";
-        handle.dataset.pointIndex = String(pointIndex);
-        handle.style.display = index === state.selectedObjectIndex ? "block" : "none";
-        handle.addEventListener("pointerdown", (event) => startDrag(event, index, pointIndex));
-        group.appendChild(handle);
-      });
 
       fragment.appendChild(group);
     });
     els.overlay.appendChild(fragment);
+    renderHandles();
+  }
+
+  function removeHandles() {
+    const handles = els.overlay.querySelector("[data-role='handles']");
+    if (handles) {
+      handles.remove();
+    }
+  }
+
+  function renderHandles() {
+    removeHandles();
+    const obj = getObjects(state.currentImage)[state.selectedObjectIndex];
+    if (!obj || !els.mainImage.naturalWidth) return;
+
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.dataset.role = "handles";
+    bboxToPoints(obj.bbox).forEach((point, pointIndex) => {
+      const handle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      handle.setAttribute("cx", String(point[0]));
+      handle.setAttribute("cy", String(point[1]));
+      handle.setAttribute("r", "6");
+      handle.setAttribute("class", "handle");
+      handle.dataset.role = "handle";
+      handle.dataset.pointIndex = String(pointIndex);
+      handle.addEventListener("pointerdown", (event) => startDrag(event, state.selectedObjectIndex, pointIndex));
+      group.appendChild(handle);
+    });
+    els.overlay.appendChild(group);
+  }
+
+  function updateSelectedHandles(objectIndex) {
+    if (objectIndex !== state.selectedObjectIndex) return;
+    const group = els.overlay.querySelector("[data-role='handles']");
+    const obj = getObjects(state.currentImage)[state.selectedObjectIndex];
+    if (!group || !obj) {
+      renderHandles();
+      return;
+    }
+    const points = bboxToPoints(obj.bbox);
+    group.querySelectorAll("[data-role='handle']").forEach((handle) => {
+      const pointIndex = Number(handle.dataset.pointIndex);
+      const point = points[pointIndex];
+      handle.setAttribute("cx", String(point[0]));
+      handle.setAttribute("cy", String(point[1]));
+    });
   }
 
   function startDrag(event, objectIndex, pointIndex) {
@@ -623,7 +759,22 @@
     renderAll();
   }
 
-  function applyZoom() {
+  function suspendOverlayForViewChange() {
+    if (!state.showBoxes) return;
+    els.overlay.classList.add("is-view-changing");
+    if (state.overlayResumeTimer) {
+      window.clearTimeout(state.overlayResumeTimer);
+    }
+    state.overlayResumeTimer = window.setTimeout(() => {
+      state.overlayResumeTimer = 0;
+      els.overlay.classList.remove("is-view-changing");
+    }, 120);
+  }
+
+  function applyZoom(suspendOverlay) {
+    if (suspendOverlay) {
+      suspendOverlayForViewChange();
+    }
     state.zoom = clampZoom(state.zoom);
     if (state.viewFrame) return;
     state.viewFrame = window.requestAnimationFrame(() => {
@@ -635,9 +786,10 @@
   function applyViewTransform() {
     els.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
     els.zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
+    applyOverlayCssVars();
   }
 
-  function zoomAt(clientX, clientY, nextZoom) {
+  function zoomAt(clientX, clientY, nextZoom, options) {
     const oldZoom = state.zoom;
     const newZoom = clampZoom(nextZoom);
     if (newZoom === oldZoom) return;
@@ -652,14 +804,14 @@
     state.zoom = newZoom;
     state.panX = offsetX - imageX * newZoom;
     state.panY = offsetY - imageY * newZoom;
-    applyZoom();
+    applyZoom(options && options.suspendOverlay);
   }
 
   function wheelZoom(event) {
     if (!state.currentImage || !els.mainImage.naturalWidth) return;
     event.preventDefault();
     const factor = Math.exp(-event.deltaY * 0.0015);
-    zoomAt(event.clientX, event.clientY, state.zoom * factor);
+    zoomAt(event.clientX, event.clientY, state.zoom * factor, { suspendOverlay: true });
   }
 
   function startPan(event) {
@@ -689,7 +841,7 @@
     }
     state.panX = state.pan.left + dx;
     state.panY = state.pan.top + dy;
-    applyZoom();
+    applyZoom(true);
   }
 
   function endPan() {
@@ -805,8 +957,10 @@
   els.nextImageBtn.addEventListener("click", () => selectAdjacentImage(1));
   els.mainImage.addEventListener("load", () => {
     resetView();
-    renderAll();
+    renderSwitchChrome();
     setStatus(`图片已加载：${state.currentImage}`, 100);
+    renderImageDetailsDeferred();
+    preloadAdjacentImages();
   });
   els.mainImage.addEventListener("error", () => {
     renderOverlay();
@@ -823,24 +977,26 @@
   });
   els.strokeWidthRange.addEventListener("input", (event) => {
     state.boxStrokeWidth = Number(event.target.value) || 3;
-    updateOverlayStyle();
+    updateOverlayMetrics();
   });
   els.labelSizeRange.addEventListener("input", (event) => {
     state.labelFontSize = Number(event.target.value) || 13;
-    updateOverlayStyle();
+    updateOverlayMetrics();
   });
   els.zoomOutBtn.addEventListener("click", () => {
     zoomAt(
       els.canvasShell.getBoundingClientRect().left + els.canvasShell.clientWidth / 2,
       els.canvasShell.getBoundingClientRect().top + els.canvasShell.clientHeight / 2,
-      state.zoom - 0.1
+      state.zoom - 0.1,
+      { suspendOverlay: true }
     );
   });
   els.zoomInBtn.addEventListener("click", () => {
     zoomAt(
       els.canvasShell.getBoundingClientRect().left + els.canvasShell.clientWidth / 2,
       els.canvasShell.getBoundingClientRect().top + els.canvasShell.clientHeight / 2,
-      state.zoom + 0.1
+      state.zoom + 0.1,
+      { suspendOverlay: true }
     );
   });
   els.addObjectBtn.addEventListener("click", addObject);

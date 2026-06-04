@@ -297,10 +297,22 @@ textarea {
   gap: 6px;
 }
 
+.image-picker-controls {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 6px;
+}
+
+.image-picker input,
 .image-picker select {
   height: 28px;
   padding: 0 8px;
   font-size: 12px;
+}
+
+.image-picker input[readonly] {
+  cursor: text;
 }
 
 .toolbar-actions output {
@@ -390,6 +402,13 @@ textarea {
   position: absolute;
   inset: 0;
   overflow: visible;
+  --box-stroke-width: 3;
+  --label-font-size: 13px;
+  --label-stroke-width: 2.86px;
+}
+
+#overlay.is-view-changing {
+  visibility: hidden;
 }
 
 .image-nav {
@@ -439,6 +458,7 @@ textarea {
 .poly {
   fill: rgba(37, 99, 235, 0.14);
   stroke: #4ade80;
+  stroke-width: var(--box-stroke-width);
   cursor: pointer;
 }
 
@@ -458,7 +478,9 @@ textarea {
 .box-label {
   paint-order: stroke;
   stroke: rgba(0, 0, 0, 0.8);
+  stroke-width: var(--label-stroke-width);
   fill: white;
+  font-size: var(--label-font-size);
   font-weight: 700;
   pointer-events: none;
 }
