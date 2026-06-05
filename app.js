@@ -15,7 +15,7 @@
     imageFilter: document.getElementById("imageFilter"),
     imageList: document.getElementById("imageList"),
     currentImageText: document.getElementById("currentImageText"),
-    imageSelect: document.getElementById("imageSelect"),
+    imageIndexText: document.getElementById("imageIndexText"),
     canvasShell: document.getElementById("canvasShell"),
     stage: document.getElementById("stage"),
     mainImage: document.getElementById("mainImage"),
@@ -30,6 +30,11 @@
     strokeWidthText: document.getElementById("strokeWidthText"),
     labelSizeRange: document.getElementById("labelSizeRange"),
     labelSizeText: document.getElementById("labelSizeText"),
+    imageInfoIndex: document.getElementById("imageInfoIndex"),
+    imageInfoSize: document.getElementById("imageInfoSize"),
+    imageInfoObjects: document.getElementById("imageInfoObjects"),
+    imageInfoZoom: document.getElementById("imageInfoZoom"),
+    imageInfoCreated: document.getElementById("imageInfoCreated"),
     zoomOutBtn: document.getElementById("zoomOutBtn"),
     zoomInBtn: document.getElementById("zoomInBtn"),
     zoomText: document.getElementById("zoomText"),
@@ -38,6 +43,7 @@
     deleteObjectBtn: document.getElementById("deleteObjectBtn"),
     objectList: document.getElementById("objectList"),
     selectedBadge: document.getElementById("selectedBadge"),
+    bboxSizeText: document.getElementById("bboxSizeText"),
     labelsEditor: document.getElementById("labelsEditor"),
     bboxGrid: document.getElementById("bboxGrid"),
     applyObjectBtn: document.getElementById("applyObjectBtn")
@@ -62,6 +68,7 @@
     detailFrame: 0,
     overlayFrame: 0,
     overlayResumeTimer: 0,
+    imageListScrollFrame: 0,
     renderVersion: 0,
     suppressNextClick: false
   };
@@ -180,19 +187,12 @@
     const visibleNames = state.imageNames.filter((name) => name.toLowerCase().includes(filter));
 
     els.imageCount.textContent = String(state.imageNames.length);
-    els.imageSelect.innerHTML = "";
     imageButtons.clear();
     imageNameToIndex.clear();
     activeImageButton = null;
-    const optionsFragment = document.createDocumentFragment();
     state.imageNames.forEach((name, index) => {
       imageNameToIndex.set(name, index);
-      const option = document.createElement("option");
-      option.value = name;
-      option.textContent = name;
-      optionsFragment.appendChild(option);
     });
-    els.imageSelect.replaceChildren(optionsFragment);
 
     const listFragment = document.createDocumentFragment();
     visibleNames.forEach((name) => {
@@ -215,7 +215,7 @@
   function updateImageSelection() {
     els.currentImageText.value = state.currentImage;
     els.currentImageText.title = state.currentImage || "可选中复制当前图片名";
-    els.imageSelect.selectedIndex = state.currentImageIndex;
+    els.imageIndexText.textContent = state.currentImageIndex >= 0 ? `${state.currentImageIndex + 1}/${state.imageNames.length}` : "—";
     if (activeImageButton) {
       activeImageButton.classList.remove("active");
     }
@@ -224,6 +224,30 @@
       activeImageButton.classList.add("active");
     }
     renderImageNavButtons();
+    renderImageInfo();
+  }
+
+  function renderImageInfo() {
+    const hasImage = state.currentImageIndex >= 0 && !!state.currentImage;
+    const width = els.mainImage.naturalWidth || 0;
+    const height = els.mainImage.naturalHeight || 0;
+    els.imageInfoIndex.textContent = hasImage ? `${state.currentImageIndex + 1}/${state.imageNames.length}` : "—";
+    els.imageInfoSize.textContent = width && height ? `${width} × ${height}` : "—";
+    els.imageInfoObjects.textContent = String(getObjects(state.currentImage).length);
+    els.imageInfoZoom.textContent = `${Math.round(state.zoom * 100)}%`;
+    els.imageInfoCreated.textContent = hasImage ? "无法读取" : "—";
+  }
+
+  function scrollCurrentImageIntoView() {
+    if (!activeImageButton) return;
+    if (state.imageListScrollFrame) {
+      window.cancelAnimationFrame(state.imageListScrollFrame);
+    }
+    state.imageListScrollFrame = window.requestAnimationFrame(() => {
+      state.imageListScrollFrame = 0;
+      if (!activeImageButton) return;
+      activeImageButton.scrollIntoView({ block: "nearest" });
+    });
   }
 
   function currentImageIndex() {
@@ -244,7 +268,7 @@
     if (index < 0) return;
     const nextIndex = Math.max(0, Math.min(state.imageNames.length - 1, index + step));
     if (nextIndex === index) return;
-    selectImage(state.imageNames[nextIndex]);
+    selectImage(state.imageNames[nextIndex], { scrollList: true });
   }
 
   function shouldIgnoreImageShortcut(event) {
@@ -254,10 +278,13 @@
     return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
   }
 
-  function selectImage(name) {
+  function selectImage(name, options) {
     const nextName = name || "";
     if (nextName && nextName === state.currentImage) {
       updateImageSelection();
+      if (options && options.scrollList) {
+        scrollCurrentImageIntoView();
+      }
       return;
     }
     cancelDeferredRender();
@@ -266,6 +293,9 @@
     state.currentImageIndex = typeof nextIndex === "number" ? nextIndex : -1;
     state.selectedObjectIndex = -1;
     updateImageSelection();
+    if (options && options.scrollList) {
+      scrollCurrentImageIntoView();
+    }
     if (state.currentImage) {
       clearOverlay();
       els.mainImage.src = imageUrl(state.currentImage);
@@ -291,6 +321,7 @@
     renderFillToggle();
     renderSliderValues();
     applyOverlayCssVars();
+    renderImageInfo();
     applyZoom();
   }
 
@@ -302,6 +333,7 @@
     renderFillToggle();
     renderSliderValues();
     applyOverlayCssVars();
+    renderImageInfo();
     applyZoom();
   }
 
@@ -311,6 +343,7 @@
     renderFillToggle();
     renderSliderValues();
     applyOverlayCssVars();
+    renderImageInfo();
     applyZoom();
   }
 
@@ -422,7 +455,7 @@
 
   function applyOverlayCssVars() {
     const scale = getOverlayScale();
-    els.overlay.style.setProperty("--box-stroke-width", String(state.boxStrokeWidth));
+    els.overlay.style.setProperty("--box-stroke-width", String(state.boxStrokeWidth / scale));
     els.overlay.style.setProperty("--label-font-size", `${getRenderedLabelFontSize() / scale}px`);
     els.overlay.style.setProperty("--label-stroke-width", `${getRenderedLabelStrokeWidth() / scale}px`);
   }
@@ -462,6 +495,7 @@
   function renderObjects() {
     const objects = getObjects(state.currentImage);
     els.objectCount.textContent = String(objects.length);
+    els.imageInfoObjects.textContent = String(objects.length);
     activeObjectButton = null;
     const fragment = document.createDocumentFragment();
     objects.forEach((obj, index) => {
@@ -493,6 +527,7 @@
   function renderEditor() {
     const obj = getObjects(state.currentImage)[state.selectedObjectIndex];
     els.selectedBadge.textContent = obj ? `#${state.selectedObjectIndex + 1}` : "未选中";
+    els.bboxSizeText.textContent = obj ? formatBboxSize(obj.bbox) : "未选中";
     els.labelsEditor.disabled = !obj;
     els.applyObjectBtn.disabled = !obj;
     els.deleteObjectBtn.disabled = !obj;
@@ -514,6 +549,14 @@
       label.appendChild(input);
       els.bboxGrid.appendChild(label);
     });
+  }
+
+  function formatBboxSize(bbox) {
+    const xs = [bbox[0], bbox[2], bbox[4], bbox[6]];
+    const ys = [bbox[1], bbox[3], bbox[5], bbox[7]];
+    const width = Math.round(Math.max(...xs) - Math.min(...xs));
+    const height = Math.round(Math.max(...ys) - Math.min(...ys));
+    return `${width} × ${height}`;
   }
 
   function selectObject(index) {
@@ -701,6 +744,7 @@
     obj.bbox[base + 1] = Math.round(y);
     updateOverlayObject(state.drag.objectIndex);
     updateEditorBboxInputs();
+    els.bboxSizeText.textContent = formatBboxSize(obj.bbox);
   }
 
   function endDrag() {
@@ -786,6 +830,7 @@
   function applyViewTransform() {
     els.stage.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
     els.zoomText.textContent = `${Math.round(state.zoom * 100)}%`;
+    els.imageInfoZoom.textContent = els.zoomText.textContent;
     applyOverlayCssVars();
   }
 
@@ -950,7 +995,6 @@
     if (!button || !els.imageList.contains(button)) return;
     selectImage(button.dataset.imageName);
   });
-  els.imageSelect.addEventListener("change", (event) => selectImage(event.target.value));
   els.prevImageBtn.addEventListener("pointerdown", stopPointerBubble);
   els.nextImageBtn.addEventListener("pointerdown", stopPointerBubble);
   els.prevImageBtn.addEventListener("click", () => selectAdjacentImage(-1));

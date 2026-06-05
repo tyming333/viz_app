@@ -220,6 +220,24 @@ textarea {
   font-size: 12px;
 }
 
+.bbox-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -2px 0 10px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bbox-summary output {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .progress {
   height: 6px;
   margin: 10px 0;
@@ -289,6 +307,25 @@ textarea {
   box-shadow: var(--shadow);
 }
 
+.image-info {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  box-shadow: var(--shadow);
+}
+
+.image-info output {
+  color: var(--text);
+}
+
 .image-picker {
   min-width: 0;
   display: grid;
@@ -300,15 +337,26 @@ textarea {
 .image-picker-controls {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 96px;
+  grid-template-columns: minmax(0, 1fr) 84px;
   gap: 6px;
 }
 
 .image-picker input,
-.image-picker select {
+.image-picker output {
   height: 28px;
   padding: 0 8px;
   font-size: 12px;
+}
+
+.image-picker output {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .image-picker input[readonly] {

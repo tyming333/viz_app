@@ -59,7 +59,7 @@
             <span>当前图片</span>
             <div class="image-picker-controls">
               <input id="currentImageText" type="text" readonly value="" title="可选中复制当前图片名" />
-              <select id="imageSelect" title="切换当前图片"></select>
+              <output id="imageIndexText" title="当前图片序号">—</output>
             </div>
           </label>
           <div class="toolbar-actions">
@@ -80,6 +80,14 @@
             <output id="zoomText">100%</output>
             <button id="zoomInBtn" type="button">+</button>
           </div>
+        </div>
+
+        <div class="image-info" aria-live="polite">
+          <span>序号：<output id="imageInfoIndex">—</output></span>
+          <span>宽高：<output id="imageInfoSize">—</output></span>
+          <span>Objects：<output id="imageInfoObjects">0</output></span>
+          <span>缩放：<output id="imageInfoZoom">100%</output></span>
+          <span>创建时间：<output id="imageInfoCreated">无法读取</output></span>
         </div>
 
         <div id="canvasShell" class="canvas-shell">
@@ -113,6 +121,10 @@
           <div class="panel-title">
             <strong>编辑</strong>
             <span id="selectedBadge">未选中</span>
+          </div>
+          <div class="bbox-summary">
+            <span>外接矩形</span>
+            <output id="bboxSizeText">未选中</output>
           </div>
           <label class="field">
             <span>labels，每行一个</span>
