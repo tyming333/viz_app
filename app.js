@@ -38,6 +38,8 @@
     strokeWidthText: document.getElementById("strokeWidthText"),
     labelSizeRange: document.getElementById("labelSizeRange"),
     labelSizeText: document.getElementById("labelSizeText"),
+    brightnessRange: document.getElementById("brightnessRange"),
+    brightnessText: document.getElementById("brightnessText"),
     imageInfoIndex: document.getElementById("imageInfoIndex"),
     imageInfoSize: document.getElementById("imageInfoSize"),
     imageInfoObjects: document.getElementById("imageInfoObjects"),
@@ -79,6 +81,7 @@
     showBoxFill: true,
     boxStrokeWidth: 3,
     labelFontSize: 13,
+    imageBrightness: 100,
     viewFrame: 0,
     overlayFrame: 0,
     imageListScrollFrame: 0,
@@ -387,6 +390,10 @@
 
   function clampZoom(value) {
     return Math.max(0.1, Math.min(4, value));
+  }
+
+  function clampBrightness(value) {
+    return Math.max(60, Math.min(220, value));
   }
 
   function getVisibleImageNames() {
@@ -747,6 +754,8 @@
     els.strokeWidthText.textContent = formatSliderValue(state.boxStrokeWidth);
     els.labelSizeRange.value = String(state.labelFontSize);
     els.labelSizeText.textContent = String(state.labelFontSize);
+    els.brightnessRange.value = String(state.imageBrightness);
+    els.brightnessText.textContent = Math.round(state.imageBrightness) + "%";
   }
 
   function renderBoxVisibilityToggle() {
@@ -1117,6 +1126,10 @@
     renderOverlay();
   }
 
+  function applyImageBrightness() {
+    els.mainImage.style.filter = "brightness(" + (state.imageBrightness / 100).toFixed(2) + ")";
+  }
+
   function applyZoom() {
     state.zoom = clampZoom(state.zoom);
     if (state.viewFrame) return;
@@ -1383,6 +1396,11 @@
     renderSliderValues();
     renderOverlay();
   });
+  els.brightnessRange.addEventListener("input", function oninput(event) {
+    state.imageBrightness = clampBrightness(Number(event.target.value) || 100);
+    renderSliderValues();
+    applyImageBrightness();
+  });
   els.zoomOutBtn.addEventListener("click", function onzoomout() {
     const rect = els.canvasShell.getBoundingClientRect();
     zoomAt(rect.left + els.canvasShell.clientWidth / 2, rect.top + els.canvasShell.clientHeight / 2, state.zoom - 0.1);
@@ -1431,4 +1449,5 @@
   });
 
   renderFull();
+  applyImageBrightness();
 })();

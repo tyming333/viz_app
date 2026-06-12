@@ -464,6 +464,7 @@ textarea {
   max-width: none;
   user-select: none;
   -webkit-user-drag: none;
+  will-change: filter;
 }
 
 #overlayCanvas {
