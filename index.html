@@ -3,14 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TY可视化工具</title>
+    <title>数据可视化工具</title>
     <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <h1>TY可视化工具</h1>
-        <p><strong>Ming：</strong>只支持 <code>det.objects[*].bbox</code> 的四点八绝对坐标格式</p>
+      <div class="brand">
+        <h1>数据可视化工具</h1>
+        <p><strong>说明:</strong> 当前仅支持 <code>det.objects[*].bbox</code> 的四点八绝对坐标格式。</p>
       </div>
       <div class="actions">
         <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
@@ -20,10 +21,10 @@
 
     <main class="layout">
       <aside class="sidebar">
-        <section class="panel">
+        <section class="panel import-panel">
           <label class="field">
             <span>图片 prefix</span>
-            <input id="prefixInput" type="text" placeholder="例如：D:/dataset/images/" />
+            <input id="prefixInput" type="text" placeholder="例如: D:/dataset/images/" />
           </label>
           <label class="field">
             <span>导入 JSON 文件</span>
@@ -31,7 +32,11 @@
           </label>
           <label class="field fill">
             <span>JSON 文本</span>
-            <textarea id="jsonInput" spellcheck="false" placeholder='{"image.jpg":{"det":{"objects":[{"labels":["类别"],"bbox":[10,10,100,10,100,80,10,80],"attrs":{}}]}}}'></textarea>
+            <textarea
+              id="jsonInput"
+              spellcheck="false"
+              placeholder='{"image.jpg":{"det":{"objects":[{"labels":["class_name"],"bbox":[10,10,100,10,100,80,10,80],"attrs":{}}]}}}'
+            ></textarea>
           </label>
           <div class="row">
             <button id="loadBtn" type="button">加载数据</button>
@@ -48,8 +53,34 @@
             <strong>图片</strong>
             <span id="imageCount">0</span>
           </div>
-          <input id="imageFilter" type="search" placeholder="筛选图片名" />
-          <div id="imageList" class="list"></div>
+          <div class="filter-stack">
+            <input id="imageFilter" type="search" placeholder="筛选图片名" />
+            <input id="labelFilter" type="search" placeholder="筛选 labels" />
+            <div class="filter-range-grid">
+              <label class="range-field">
+                <span>宽度</span>
+                <div class="range-inputs">
+                  <input id="widthMinFilter" type="number" min="0" step="1" placeholder="min" />
+                  <input id="widthMaxFilter" type="number" min="0" step="1" placeholder="max" />
+                </div>
+              </label>
+              <label class="range-field">
+                <span>高度</span>
+                <div class="range-inputs">
+                  <input id="heightMinFilter" type="number" min="0" step="1" placeholder="min" />
+                  <input id="heightMaxFilter" type="number" min="0" step="1" placeholder="max" />
+                </div>
+              </label>
+            </div>
+            <div class="filter-note">
+              <span id="knownSizeText">宽高筛选基于已知图像尺寸 0/0</span>
+              <div class="filter-actions">
+                <button id="applyFiltersBtn" type="button">确定</button>
+                <button id="clearFiltersBtn" type="button">清空</button>
+              </div>
+            </div>
+          </div>
+          <div id="imageList" class="virtual-list" aria-label="image list"></div>
         </section>
       </aside>
 
@@ -59,13 +90,13 @@
             <span>当前图片</span>
             <div class="image-picker-controls">
               <input id="currentImageText" type="text" readonly value="" title="可选中复制当前图片名" />
-              <output id="imageIndexText" title="当前图片序号">—</output>
+              <output id="imageIndexText" title="当前图片序号">-</output>
             </div>
           </label>
           <div class="toolbar-actions">
             <button id="resetViewBtn" type="button">复位</button>
-            <button id="boxVisibilityBtn" type="button">显示框</button>
-            <button id="fillToggleBtn" type="button">框颜色</button>
+            <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
+            <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
             <label class="toolbar-slider" title="框线基础粗细">
               <span>框粗细</span>
               <input id="strokeWidthRange" type="range" min="0.5" max="12" step="0.5" value="3" />
@@ -76,28 +107,28 @@
               <input id="labelSizeRange" type="range" min="8" max="28" step="1" value="13" />
               <output id="labelSizeText">13</output>
             </label>
-            <button id="zoomOutBtn" type="button">-</button>
+            <button id="zoomOutBtn" type="button" aria-label="缩小">-</button>
             <output id="zoomText">100%</output>
-            <button id="zoomInBtn" type="button">+</button>
+            <button id="zoomInBtn" type="button" aria-label="放大">+</button>
           </div>
         </div>
 
         <div class="image-info" aria-live="polite">
-          <span>序号：<output id="imageInfoIndex">—</output></span>
-          <span>宽高：<output id="imageInfoSize">—</output></span>
-          <span>Objects：<output id="imageInfoObjects">0</output></span>
-          <span>缩放：<output id="imageInfoZoom">100%</output></span>
-          <span>创建时间：<output id="imageInfoCreated">无法读取</output></span>
+          <span>序号: <output id="imageInfoIndex">-</output></span>
+          <span>宽高: <output id="imageInfoSize">-</output></span>
+          <span>Objects: <output id="imageInfoObjects">0</output></span>
+          <span>缩放: <output id="imageInfoZoom">100%</output></span>
+          <span>创建时间: <output id="imageInfoCreated">无法读取</output></span>
         </div>
 
         <div id="canvasShell" class="canvas-shell">
           <div id="stage" class="stage">
             <img id="mainImage" alt="" />
-            <svg id="overlay" aria-label="objects overlay"></svg>
+            <canvas id="overlayCanvas" aria-label="objects overlay"></canvas>
           </div>
           <div id="emptyState" class="empty-state">
             <strong>未加载数据</strong>
-            <span>输入 prefix 和 JSON 后开始查看 objects 框</span>
+            <span>输入 prefix 和 JSON 后开始查看 objects 框。</span>
           </div>
           <button id="prevImageBtn" class="image-nav image-nav-prev" type="button" aria-label="上一张">&lsaquo;</button>
           <button id="nextImageBtn" class="image-nav image-nav-next" type="button" aria-label="下一张">&rsaquo;</button>
@@ -105,7 +136,7 @@
       </section>
 
       <aside class="inspector">
-        <section class="panel">
+        <section class="panel list-panel">
           <div class="panel-title">
             <strong>Objects</strong>
             <span id="objectCount">0</span>
@@ -114,7 +145,7 @@
             <button id="addObjectBtn" type="button">新增框</button>
             <button id="deleteObjectBtn" type="button">删除选中</button>
           </div>
-          <div id="objectList" class="object-list"></div>
+          <div id="objectList" class="virtual-list" aria-label="object list"></div>
         </section>
 
         <section class="panel editor-panel">
@@ -127,7 +158,7 @@
             <output id="bboxSizeText">未选中</output>
           </div>
           <label class="field">
-            <span>labels，每行一个</span>
+            <span>labels, 每行一个</span>
             <textarea id="labelsEditor" spellcheck="false"></textarea>
           </label>
           <div class="bbox-grid" id="bboxGrid"></div>
@@ -135,7 +166,5 @@
         </section>
       </aside>
     </main>
-
-    <script src="./app.js"></script>
   </body>
 </html>
