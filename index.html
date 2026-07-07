@@ -10,8 +10,7 @@
   <body>
     <header class="topbar">
       <div class="brand">
-        <h1>数据可视化工具</h1>
-        <p><strong>说明:</strong> 当前仅支持 <code>det.objects[*].bbox</code> 的四点八绝对坐标格式。</p>
+        <h1>数据可视化工具 <span class="version-label">wanhaoming version 1.0</span></h1>
       </div>
       <div class="actions">
         <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
@@ -116,14 +115,14 @@
             <output id="zoomText">100%</output>
             <button id="zoomInBtn" type="button" aria-label="放大">+</button>
           </div>
-        </div>
 
-        <div class="image-info" aria-live="polite">
-          <span>序号: <output id="imageInfoIndex">-</output></span>
-          <span>宽高: <output id="imageInfoSize">-</output></span>
-          <span>Objects: <output id="imageInfoObjects">0</output></span>
-          <span>缩放: <output id="imageInfoZoom">100%</output></span>
-          <span>创建时间: <output id="imageInfoCreated">无法读取</output></span>
+          <div class="image-info" aria-live="polite">
+            <span>序号: <output id="imageInfoIndex">-</output></span>
+            <span>宽高: <output id="imageInfoSize">-</output></span>
+            <span>Objects: <output id="imageInfoObjects">0</output></span>
+            <span>缩放: <output id="imageInfoZoom">100%</output></span>
+            <span>创建时间: <output id="imageInfoCreated">无法读取</output></span>
+          </div>
         </div>
 
         <div id="canvasShell" class="canvas-shell">

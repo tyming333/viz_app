@@ -421,7 +421,7 @@
   }
 
   function updateKnownSizeText() {
-    els.knownSizeText.textContent = "瀹介珮绛涢€夊熀浜庡凡鐭ュ浘鍍忓昂瀵?" + state.knownImageSizes.size + "/" + state.imageNames.length;
+    els.knownSizeText.textContent = "宽高筛选基于已知图像尺寸 " + state.knownImageSizes.size + "/" + state.imageNames.length;
   }
 
   function cancelImageSizeScan() {
@@ -435,7 +435,7 @@
     if (!state.sizeScanActive) return;
     const total = Math.max(1, state.sizeScanTotal);
     const percent = 70 + Math.round((state.sizeScanCompleted / total) * 29);
-    setStatus("姝ｅ湪璇诲彇鍥剧墖灏哄... " + state.sizeScanCompleted + "/" + state.sizeScanTotal, percent);
+    setStatus("正在读取图片尺寸... " + state.sizeScanCompleted + "/" + state.sizeScanTotal, percent);
   }
 
   function loadImageSize(url) {
@@ -479,7 +479,7 @@
     updateKnownSizeText();
 
     if (!names.length) {
-      setStatus("娌℃湁鍙鍙栧昂瀵哥殑鍥剧墖", 100);
+      setStatus("没有可读取尺寸的图片", 100);
       return;
     }
 
@@ -516,7 +516,7 @@
 
     state.sizeScanActive = false;
     renderImageControls();
-    setStatus("宸插畬鎴愬浘鐗囧昂瀵歌鍙? " + state.knownImageSizes.size + "/" + state.imageNames.length, 100);
+    setStatus("已完成图片尺寸读取 " + state.knownImageSizes.size + "/" + state.imageNames.length, 100);
   }
 
   function clearFilters() {
@@ -531,7 +531,7 @@
 
   function applyFilters() {
     renderImageControls();
-    setStatus("宸插埛鏂扮瓫閫夌粨鏋? " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
+    setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
 
   function exportText() {
@@ -544,16 +544,16 @@
     const reader = new FileReader();
     reader.onprogress = function onprogress(event) {
       if (event.lengthComputable) {
-        setStatus("璇诲彇 JSON 鏂囦欢...", Math.round((event.loaded / event.total) * 45));
+        setStatus("读取 JSON 文件...", Math.round((event.loaded / event.total) * 45));
       }
     };
     reader.onload = function onload() {
       els.jsonInput.value = String(reader.result || "");
-      setStatus("JSON 鏂囦欢璇诲彇瀹屾垚", 50);
+      setStatus("JSON 文件读取完成", 50);
       loadJson();
     };
     reader.onerror = function onerror() {
-      setStatus("JSON 鏂囦欢璇诲彇澶辫触", 0);
+      setStatus("JSON 文件读取失败", 0);
     };
     reader.readAsText(file, "utf-8");
   }
@@ -569,7 +569,7 @@
     imageWorker.addEventListener("message", function onmessage(event) {
       const message = event.data || {};
       if (message.type === "progress") {
-        const phaseText = message.phase === "parse" ? "瑙ｆ瀽 JSON..." : "鏍￠獙鏁版嵁...";
+        const phaseText = message.phase === "parse" ? "解析 JSON..." : "校验数据...";
         setStatus(phaseText, message.percent);
         return;
       }
@@ -583,7 +583,7 @@
         state.currentImage = "";
         state.currentImageIndex = -1;
         state.selectedObjectIndex = -1;
-        setStatus("鍔犺浇澶辫触: " + message.message, 0);
+        setStatus("加载失败: " + message.message, 0);
         renderFull();
         return;
       }
@@ -593,7 +593,7 @@
     });
     imageWorker.addEventListener("error", function onerror() {
       imageWorker = null;
-      setStatus("Worker 涓嶅彲鐢紝鍒囨崲涓轰富绾跨▼瑙ｆ瀽...", 8);
+      setStatus("Worker 不可用，切换为主线程解析...", 8);
       window.setTimeout(function fallback() {
         loadJsonOnMainThread(els.jsonInput.value);
       }, 0);
@@ -613,7 +613,7 @@
     state.currentImageIndex = -1;
     state.selectedObjectIndex = -1;
     const firstImage = state.imageNames[0] || "";
-    setStatus("宸插姞杞?" + state.imageNames.length + " 寮犲浘鐗? " + payload.objectTotal + " 涓?objects", 70);
+    setStatus("已加载 " + state.imageNames.length + " 张图片，" + payload.objectTotal + " 个 objects", 70);
     renderImageControls();
     selectImage(firstImage);
     state.sizeScanActive = state.imageNames.length > 0;
@@ -621,21 +621,21 @@
     state.sizeScanTotal = state.imageNames.length;
     window.setTimeout(startImageSizeScan, 0);
     if (state.imageNames.length) {
-      setStatus("姝ｅ湪璇诲彇鍥剧墖灏哄... 0/" + state.imageNames.length, 70);
+      setStatus("正在读取图片尺寸... 0/" + state.imageNames.length, 70);
       return;
     }
     if (state.imageNames.length) {
-      setStatus("姝ｅ湪璇诲彇鍥剧墖灏哄... 0/" + state.imageNames.length, 70);
+      setStatus("正在读取图片尺寸... 0/" + state.imageNames.length, 70);
     }
-    setStatus("宸插姞杞?" + state.imageNames.length + " 寮犲浘鐗? " + payload.objectTotal + " 涓?objects", 100);
+    setStatus("已加载 " + state.imageNames.length + " 张图片，" + payload.objectTotal + " 个 objects", 100);
   }
 
   function loadJsonOnMainThread(text) {
     try {
-      setStatus("瑙ｆ瀽 JSON...", 10);
+      setStatus("解析 JSON...", 10);
       cancelImageSizeScan();
       const parsed = JSON.parse(text);
-      setStatus("鏍￠獙鏁版嵁...", 40);
+      setStatus("校验数据...", 40);
       const result = validateData(parsed);
       applyLoadedPayload({
         data: parsed,
@@ -654,7 +654,7 @@
       state.currentImage = "";
       state.currentImageIndex = -1;
       state.selectedObjectIndex = -1;
-      setStatus("鍔犺浇澶辫触: " + error.message, 0);
+      setStatus("加载失败: " + error.message, 0);
       renderFull();
     }
   }
@@ -662,7 +662,7 @@
   function loadJson() {
     const text = els.jsonInput.value;
     if (!text.trim()) {
-      setStatus("璇疯緭鍏ユ垨瀵煎叆 JSON", 0);
+      setStatus("请输入或导入 JSON", 0);
       return;
     }
     cancelImageSizeScan();
@@ -677,7 +677,7 @@
       jobId: state.workerJobId,
       text: text
     });
-    setStatus("鍑嗗瑙ｆ瀽 JSON...", 2);
+    setStatus("准备解析 JSON...", 2);
   }
 
   function renderImageControls() {
@@ -736,7 +736,7 @@
     els.imageInfoSize.textContent = width && height ? width + " x " + height : "-";
     els.imageInfoObjects.textContent = String(currentObjects().length);
     els.imageInfoZoom.textContent = Math.round(state.zoom * 100) + "%";
-    els.imageInfoCreated.textContent = hasImage ? "鏃犳硶璇诲彇" : "-";
+    els.imageInfoCreated.textContent = hasImage ? "无法读取" : "-";
   }
 
   function renderImageNavButtons() {
@@ -761,7 +761,7 @@
   function renderBoxVisibilityToggle() {
     els.boxVisibilityBtn.classList.toggle("active", state.showBoxes);
     els.boxVisibilityBtn.setAttribute("aria-pressed", String(state.showBoxes));
-    els.boxVisibilityBtn.title = state.showBoxes ? "闅愯棌鎵€鏈夋" : "鏄剧ず鎵€鏈夋";
+    els.boxVisibilityBtn.title = state.showBoxes ? "隐藏所有框" : "显示所有框";
   }
 
   function renderFillToggle() {
@@ -1024,7 +1024,7 @@
       els.mainImage.src = imageUrl(state.currentImage);
       els.mainImage.alt = state.currentImage;
       els.emptyState.style.display = "none";
-      setStatus("鍔犺浇鍥剧墖: " + state.currentImage, 72);
+      setStatus("加载图片: " + state.currentImage, 72);
     } else {
       els.mainImage.removeAttribute("src");
       els.emptyState.style.display = "grid";
@@ -1104,7 +1104,7 @@
     state.selectedObjectIndex = objects.length - 1;
     refreshImageMeta(state.currentImage);
     renderImageControls();
-    setStatus("宸叉柊澧?object", 100);
+    setStatus("已新增 object", 100);
     renderAll();
   }
 
@@ -1115,7 +1115,7 @@
     state.selectedObjectIndex = Math.min(state.selectedObjectIndex, objects.length - 1);
     refreshImageMeta(state.currentImage);
     renderImageControls();
-    setStatus("宸插垹闄ら€変腑 object", 100);
+    setStatus("已删除选中 object", 100);
     renderAll();
   }
 
@@ -1270,11 +1270,11 @@
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
-      setStatus("宸插鍒?JSON", 100);
+      setStatus("已复制 JSON", 100);
     } catch (error) {
       els.jsonInput.value = text;
       els.jsonInput.select();
-      setStatus("褰撳墠娴忚鍣ㄤ笉鍏佽鐩存帴澶嶅埗, 宸查€変腑鏂囨湰", 100);
+      setStatus("当前浏览器不允许直接复制，已选中文本", 100);
     }
   }
 
@@ -1287,15 +1287,15 @@
     link.download = "annotations_det_edited.json";
     link.click();
     URL.revokeObjectURL(link.href);
-    setStatus("宸插鍑?JSON", 100);
+    setStatus("已导出 JSON", 100);
   }
 
   function formatJson() {
     try {
       els.jsonInput.value = JSON.stringify(JSON.parse(els.jsonInput.value), null, 2);
-      setStatus("宸叉牸寮忓寲 JSON", 100);
+      setStatus("已格式化 JSON", 100);
     } catch (error) {
-      setStatus("鏍煎紡鍖栧け璐? " + error.message, 0);
+      setStatus("格式化失败: " + error.message, 0);
     }
   }
 
@@ -1366,14 +1366,14 @@
       preloadAdjacentImages();
       return;
     }
-    setStatus("鍥剧墖宸插姞杞? " + state.currentImage, 100);
+    setStatus("图片已加载: " + state.currentImage, 100);
     renderAll();
     preloadAdjacentImages();
   });
   els.mainImage.addEventListener("error", function onerror() {
     syncCanvasSize();
     renderOverlay();
-    setStatus("鍥剧墖鍔犺浇澶辫触, 璇锋鏌?prefix: " + state.currentImage, 0);
+    setStatus("图片加载失败，请检查 prefix: " + state.currentImage, 0);
   });
   els.resetViewBtn.addEventListener("click", resetView);
   els.boxVisibilityBtn.addEventListener("click", function onbox() {
