@@ -1,5 +1,27 @@
 "use strict";
 
+function validateObjectKeypoints(imageName, obj, objectIndex) {
+  if (obj.keypoints === undefined || obj.keypoints === null) return;
+  if (typeof obj.keypoints !== "object" || Array.isArray(obj.keypoints)) {
+    throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints 必须是对象");
+  }
+  if (!Array.isArray(obj.keypoints.points)) {
+    throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints.points 必须是坐标数组");
+  }
+  for (let i = 0; i < obj.keypoints.points.length; i += 1) {
+    const point = obj.keypoints.points[i];
+    if (!Array.isArray(point) || point.length < 2) {
+      throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoint " + (i + 1) + " 必须是 [x, y]");
+    }
+    if (typeof point[0] !== "number" || !Number.isFinite(point[0]) || typeof point[1] !== "number" || !Number.isFinite(point[1])) {
+      throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoint " + (i + 1) + " 坐标不是有效数字");
+    }
+  }
+  if (obj.keypoints.names !== undefined && obj.keypoints.names !== null && !Array.isArray(obj.keypoints.names)) {
+    throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints.names 必须是数组");
+  }
+}
+
 function validateData(data) {
   if (!data || Array.isArray(data) || typeof data !== "object") {
     throw new Error("JSON 根节点必须是图片名到标注内容的对象");
@@ -35,6 +57,7 @@ function validateData(data) {
       if (!obj.attrs || typeof obj.attrs !== "object" || Array.isArray(obj.attrs)) {
         obj.attrs = {};
       }
+      validateObjectKeypoints(name, obj, j);
       for (let k = 0; k < obj.labels.length; k += 1) {
         const text = String(obj.labels[k] || "").trim();
         if (text) labels.add(text);

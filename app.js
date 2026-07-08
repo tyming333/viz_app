@@ -34,6 +34,8 @@
     resetViewBtn: document.getElementById("resetViewBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
+    keypointVisibilityBtn: document.getElementById("keypointVisibilityBtn"),
+    keypointLabelBtn: document.getElementById("keypointLabelBtn"),
     strokeWidthRange: document.getElementById("strokeWidthRange"),
     strokeWidthText: document.getElementById("strokeWidthText"),
     labelSizeRange: document.getElementById("labelSizeRange"),
@@ -79,6 +81,8 @@
     pan: null,
     showBoxes: true,
     showBoxFill: true,
+    showKeypoints: true,
+    showKeypointLabels: true,
     boxStrokeWidth: 3,
     labelFontSize: 13,
     imageBrightness: 100,
@@ -95,6 +99,27 @@
 
   const preloadImages = new Map();
   let imageWorker = null;
+
+  function validateObjectKeypoints(imageName, obj, objectIndex) {
+    if (obj.keypoints === undefined || obj.keypoints === null) return;
+    if (typeof obj.keypoints !== "object" || Array.isArray(obj.keypoints)) {
+      throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints 必须是对象");
+    }
+    if (!Array.isArray(obj.keypoints.points)) {
+      throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints.points 必须是坐标数组");
+    }
+    obj.keypoints.points.forEach(function eachKeypoint(point, pointIndex) {
+      if (!Array.isArray(point) || point.length < 2) {
+        throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoint " + (pointIndex + 1) + " 必须是 [x, y]");
+      }
+      if (typeof point[0] !== "number" || !Number.isFinite(point[0]) || typeof point[1] !== "number" || !Number.isFinite(point[1])) {
+        throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoint " + (pointIndex + 1) + " 坐标不是有效数字");
+      }
+    });
+    if (obj.keypoints.names !== undefined && obj.keypoints.names !== null && !Array.isArray(obj.keypoints.names)) {
+      throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints.names 必须是数组");
+    }
+  }
 
   function validateData(data) {
     if (!data || Array.isArray(data) || typeof data !== "object") {
@@ -126,6 +151,7 @@
         if (!obj.attrs || typeof obj.attrs !== "object" || Array.isArray(obj.attrs)) {
           obj.attrs = {};
         }
+        validateObjectKeypoints(name, obj, index);
       });
       objectTotal += objects.length;
       meta[name] = buildImageMetaFromObjects(name, objects);
@@ -386,6 +412,16 @@
       [bbox[4], bbox[5]],
       [bbox[6], bbox[7]]
     ];
+  }
+
+  function getObjectKeypointPoints(obj) {
+    if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return [];
+    return obj.keypoints.points;
+  }
+
+  function getObjectKeypointNames(obj) {
+    if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.names)) return [];
+    return obj.keypoints.names;
   }
 
   function clampZoom(value) {
@@ -693,7 +729,9 @@
     const objects = currentObjects();
     const labels = objects.map(function formatObjectLabel(obj, index) {
       const text = Array.isArray(obj.labels) && obj.labels.length ? obj.labels.join(" / ") : "未命名";
-      return text || "object " + (index + 1);
+      const keypointCount = getObjectKeypointPoints(obj).length;
+      const suffix = keypointCount ? " · " + keypointCount + " pts" : "";
+      return (text || "object " + (index + 1)) + suffix;
     });
     els.objectCount.textContent = String(objects.length);
     els.imageInfoObjects.textContent = String(objects.length);
@@ -769,6 +807,18 @@
     els.fillToggleBtn.setAttribute("aria-pressed", String(state.showBoxFill));
   }
 
+  function renderKeypointVisibilityToggle() {
+    els.keypointVisibilityBtn.classList.toggle("active", state.showKeypoints);
+    els.keypointVisibilityBtn.setAttribute("aria-pressed", String(state.showKeypoints));
+    els.keypointVisibilityBtn.title = state.showKeypoints ? "隐藏所有关键点" : "显示所有关键点";
+  }
+
+  function renderKeypointLabelToggle() {
+    els.keypointLabelBtn.classList.toggle("active", state.showKeypointLabels);
+    els.keypointLabelBtn.setAttribute("aria-pressed", String(state.showKeypointLabels));
+    els.keypointLabelBtn.title = state.showKeypointLabels ? "隐藏关键点标签" : "显示关键点标签";
+  }
+
   function updateImageSelection() {
     els.currentImageText.value = state.currentImage;
     els.currentImageText.title = state.currentImage || "可选中复制当前图片名";
@@ -779,20 +829,32 @@
   }
 
   function clearOverlayCanvas() {
+    overlayContext.setTransform(1, 0, 0, 1, 0, 0);
     overlayContext.clearRect(0, 0, els.overlayCanvas.width, els.overlayCanvas.height);
   }
 
   function syncCanvasSize() {
-    const width = els.mainImage.naturalWidth || els.mainImage.width || 0;
-    const height = els.mainImage.naturalHeight || els.mainImage.height || 0;
+    const imageWidth = els.mainImage.naturalWidth || els.mainImage.width || 0;
+    const imageHeight = els.mainImage.naturalHeight || els.mainImage.height || 0;
+    const canvasWidth = els.canvasShell.clientWidth || 1;
+    const canvasHeight = els.canvasShell.clientHeight || 1;
     const dpr = window.devicePixelRatio || 1;
-    els.overlayCanvas.width = Math.max(1, Math.round(width * dpr));
-    els.overlayCanvas.height = Math.max(1, Math.round(height * dpr));
-    els.overlayCanvas.style.width = (width || 1) + "px";
-    els.overlayCanvas.style.height = (height || 1) + "px";
+    els.overlayCanvas.width = Math.max(1, Math.round(canvasWidth * dpr));
+    els.overlayCanvas.height = Math.max(1, Math.round(canvasHeight * dpr));
+    els.overlayCanvas.style.width = canvasWidth + "px";
+    els.overlayCanvas.style.height = canvasHeight + "px";
     overlayContext.setTransform(dpr, 0, 0, dpr, 0, 0);
-    els.stage.style.width = width ? width + "px" : "100%";
-    els.stage.style.height = height ? height + "px" : "100%";
+    els.stage.style.width = imageWidth ? imageWidth + "px" : "100%";
+    els.stage.style.height = imageHeight ? imageHeight + "px" : "100%";
+  }
+
+  function syncOverlayCanvasSizeIfNeeded() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.round((els.canvasShell.clientWidth || 1) * dpr));
+    const height = Math.max(1, Math.round((els.canvasShell.clientHeight || 1) * dpr));
+    if (els.overlayCanvas.width !== width || els.overlayCanvas.height !== height) {
+      syncCanvasSize();
+    }
   }
 
   function getRenderedLabelFontSize() {
@@ -880,6 +942,42 @@
     overlayContext.restore();
   }
 
+  function drawKeypoints(points, color, active) {
+    if (!points.length) return;
+    const radius = (active ? 5.5 : 4.5) / getOverlayScale();
+    overlayContext.save();
+    overlayContext.lineWidth = (active ? 2.5 : 1.5) / getOverlayScale();
+    overlayContext.strokeStyle = active ? "#facc15" : "#ffffff";
+    overlayContext.fillStyle = color;
+    points.forEach(function eachKeypoint(point) {
+      overlayContext.beginPath();
+      overlayContext.arc(point[0], point[1], radius, 0, Math.PI * 2);
+      overlayContext.fill();
+      overlayContext.stroke();
+    });
+    overlayContext.restore();
+  }
+
+  function drawKeypointLabels(points, names, active) {
+    if (!points.length) return;
+    overlayContext.save();
+    overlayContext.font = "700 " + Math.max(8, getRenderedLabelFontSize() - 2) / getOverlayScale() + "px Microsoft YaHei";
+    overlayContext.textBaseline = "middle";
+    overlayContext.lineJoin = "round";
+    overlayContext.lineWidth = getRenderedLabelStrokeWidth() / getOverlayScale();
+    overlayContext.strokeStyle = "rgba(0,0,0,0.82)";
+    overlayContext.fillStyle = active ? "#facc15" : "#ffffff";
+    points.forEach(function eachKeypointLabel(point, index) {
+      const rawName = names[index];
+      const label = rawName === undefined || rawName === null || rawName === "" ? "p" + (index + 1) : String(rawName);
+      const x = point[0] + 7 / getOverlayScale();
+      const y = point[1] - 7 / getOverlayScale();
+      overlayContext.strokeText(label, x, y);
+      overlayContext.fillText(label, x, y);
+    });
+    overlayContext.restore();
+  }
+
   function drawHandles() {
     const obj = currentObject();
     if (!obj) return;
@@ -898,16 +996,33 @@
   }
 
   function renderOverlayNow() {
+    syncOverlayCanvasSizeIfNeeded();
     clearOverlayCanvas();
-    if (!state.showBoxes || !state.currentImage || !els.mainImage.naturalWidth) return;
+    if (!state.currentImage || !els.mainImage.naturalWidth) return;
+    const dpr = window.devicePixelRatio || 1;
+    overlayContext.setTransform(dpr, 0, 0, dpr, 0, 0);
+    overlayContext.translate(state.panX, state.panY);
+    overlayContext.scale(state.zoom, state.zoom);
     const objects = currentObjects();
     objects.forEach(function eachObject(obj, index) {
       const points = bboxToPoints(obj.bbox);
       const color = colors[index % colors.length];
-      drawPolygon(points, color, "rgba(37,99,235,0.14)", index === state.selectedObjectIndex);
-      drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
+      const active = index === state.selectedObjectIndex;
+      if (state.showBoxes) {
+        drawPolygon(points, color, "rgba(37,99,235,0.14)", active);
+        drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
+      }
+      if (state.showKeypoints) {
+        const keypointPoints = getObjectKeypointPoints(obj);
+        drawKeypoints(keypointPoints, color, active);
+        if (state.showKeypointLabels) {
+          drawKeypointLabels(keypointPoints, getObjectKeypointNames(obj), active);
+        }
+      }
     });
-    drawHandles();
+    if (state.showBoxes) {
+      drawHandles();
+    }
   }
 
   function renderOverlay() {
@@ -931,6 +1046,8 @@
     renderImageNavButtons();
     renderBoxVisibilityToggle();
     renderFillToggle();
+    renderKeypointVisibilityToggle();
+    renderKeypointLabelToggle();
     renderSliderValues();
     renderImageInfo();
     applyZoom();
@@ -940,6 +1057,8 @@
     renderImageNavButtons();
     renderBoxVisibilityToggle();
     renderFillToggle();
+    renderKeypointVisibilityToggle();
+    renderKeypointLabelToggle();
     renderSliderValues();
     renderImageInfo();
     applyZoom();
@@ -952,6 +1071,8 @@
     renderImageNavButtons();
     renderBoxVisibilityToggle();
     renderFillToggle();
+    renderKeypointVisibilityToggle();
+    renderKeypointLabelToggle();
     renderSliderValues();
     renderImageInfo();
     applyZoom();
@@ -1384,6 +1505,16 @@
   els.fillToggleBtn.addEventListener("click", function onfill() {
     state.showBoxFill = !state.showBoxFill;
     renderFillToggle();
+    renderOverlay();
+  });
+  els.keypointVisibilityBtn.addEventListener("click", function onkeypoints() {
+    state.showKeypoints = !state.showKeypoints;
+    renderKeypointVisibilityToggle();
+    renderOverlay();
+  });
+  els.keypointLabelBtn.addEventListener("click", function onkeypointlabels() {
+    state.showKeypointLabels = !state.showKeypointLabels;
+    renderKeypointLabelToggle();
     renderOverlay();
   });
   els.strokeWidthRange.addEventListener("input", function oninput(event) {

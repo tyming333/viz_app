@@ -96,6 +96,8 @@
             <button id="resetViewBtn" type="button">复位</button>
             <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
             <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
+            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
+            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
             <label class="toolbar-slider" title="框线基础粗细">
               <span>框粗细</span>
               <input id="strokeWidthRange" type="range" min="0.5" max="12" step="0.5" value="3" />
@@ -128,8 +130,8 @@
         <div id="canvasShell" class="canvas-shell">
           <div id="stage" class="stage">
             <img id="mainImage" alt="" />
-            <canvas id="overlayCanvas" aria-label="objects overlay"></canvas>
           </div>
+          <canvas id="overlayCanvas" aria-label="objects overlay"></canvas>
           <div id="emptyState" class="empty-state">
             <strong>未加载数据</strong>
             <span>输入 prefix 和 JSON 后开始查看 objects 框。</span>
