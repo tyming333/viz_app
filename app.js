@@ -100,6 +100,10 @@
   const preloadImages = new Map();
   let imageWorker = null;
 
+  function isMissingKeypoint(point) {
+    return point === null || (Array.isArray(point) && point.length === 1 && point[0] === "null");
+  }
+
   function validateObjectKeypoints(imageName, obj, objectIndex) {
     if (obj.keypoints === undefined || obj.keypoints === null) return;
     if (typeof obj.keypoints !== "object" || Array.isArray(obj.keypoints)) {
@@ -109,6 +113,9 @@
       throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoints.points 必须是坐标数组");
     }
     obj.keypoints.points.forEach(function eachKeypoint(point, pointIndex) {
+      // Some annotations reserve a keypoint slot with null or ["null"].
+      // Both forms mean the point is absent and are skipped by overlay rendering.
+      if (isMissingKeypoint(point)) return;
       if (!Array.isArray(point) || point.length < 2) {
         throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoint " + (pointIndex + 1) + " 必须是 [x, y]");
       }
@@ -416,12 +423,17 @@
 
   function getObjectKeypointPoints(obj) {
     if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return [];
-    return obj.keypoints.points;
+    return obj.keypoints.points.reduce(function collectKeypoints(result, point, index) {
+      if (!isMissingKeypoint(point)) {
+        result.push({ point: point, index: index });
+      }
+      return result;
+    }, []);
   }
 
-  function getObjectKeypointNames(obj) {
-    if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.names)) return [];
-    return obj.keypoints.names;
+  function getObjectKeypointName(obj, index) {
+    if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.names)) return undefined;
+    return obj.keypoints.names[index];
   }
 
   function clampZoom(value) {
@@ -942,14 +954,15 @@
     overlayContext.restore();
   }
 
-  function drawKeypoints(points, color, active) {
-    if (!points.length) return;
+  function drawKeypoints(keypoints, color, active) {
+    if (!keypoints.length) return;
     const radius = (active ? 5.5 : 4.5) / getOverlayScale();
     overlayContext.save();
     overlayContext.lineWidth = (active ? 2.5 : 1.5) / getOverlayScale();
     overlayContext.strokeStyle = active ? "#facc15" : "#ffffff";
     overlayContext.fillStyle = color;
-    points.forEach(function eachKeypoint(point) {
+    keypoints.forEach(function eachKeypoint(keypoint) {
+      const point = keypoint.point;
       overlayContext.beginPath();
       overlayContext.arc(point[0], point[1], radius, 0, Math.PI * 2);
       overlayContext.fill();
@@ -958,8 +971,8 @@
     overlayContext.restore();
   }
 
-  function drawKeypointLabels(points, names, active) {
-    if (!points.length) return;
+  function drawKeypointLabels(keypoints, obj, active) {
+    if (!keypoints.length) return;
     overlayContext.save();
     overlayContext.font = "700 " + Math.max(8, getRenderedLabelFontSize() - 2) / getOverlayScale() + "px Microsoft YaHei";
     overlayContext.textBaseline = "middle";
@@ -967,9 +980,10 @@
     overlayContext.lineWidth = getRenderedLabelStrokeWidth() / getOverlayScale();
     overlayContext.strokeStyle = "rgba(0,0,0,0.82)";
     overlayContext.fillStyle = active ? "#facc15" : "#ffffff";
-    points.forEach(function eachKeypointLabel(point, index) {
-      const rawName = names[index];
-      const label = rawName === undefined || rawName === null || rawName === "" ? "p" + (index + 1) : String(rawName);
+    keypoints.forEach(function eachKeypointLabel(keypoint) {
+      const point = keypoint.point;
+      const rawName = getObjectKeypointName(obj, keypoint.index);
+      const label = rawName === undefined || rawName === null || rawName === "" ? "p" + (keypoint.index + 1) : String(rawName);
       const x = point[0] + 7 / getOverlayScale();
       const y = point[1] - 7 / getOverlayScale();
       overlayContext.strokeText(label, x, y);
@@ -1013,10 +1027,10 @@
         drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
       }
       if (state.showKeypoints) {
-        const keypointPoints = getObjectKeypointPoints(obj);
-        drawKeypoints(keypointPoints, color, active);
+        const keypoints = getObjectKeypointPoints(obj);
+        drawKeypoints(keypoints, color, active);
         if (state.showKeypointLabels) {
-          drawKeypointLabels(keypointPoints, getObjectKeypointNames(obj), active);
+          drawKeypointLabels(keypoints, obj, active);
         }
       }
     });

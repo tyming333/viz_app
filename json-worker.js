@@ -1,5 +1,9 @@
 "use strict";
 
+function isMissingKeypoint(point) {
+  return point === null || (Array.isArray(point) && point.length === 1 && point[0] === "null");
+}
+
 function validateObjectKeypoints(imageName, obj, objectIndex) {
   if (obj.keypoints === undefined || obj.keypoints === null) return;
   if (typeof obj.keypoints !== "object" || Array.isArray(obj.keypoints)) {
@@ -10,6 +14,9 @@ function validateObjectKeypoints(imageName, obj, objectIndex) {
   }
   for (let i = 0; i < obj.keypoints.points.length; i += 1) {
     const point = obj.keypoints.points[i];
+    // Some annotations reserve a keypoint slot with null or ["null"].
+    // Both forms mean the point is absent and are skipped by overlay rendering.
+    if (isMissingKeypoint(point)) continue;
     if (!Array.isArray(point) || point.length < 2) {
       throw new Error(imageName + " 的 object " + (objectIndex + 1) + " keypoint " + (i + 1) + " 必须是 [x, y]");
     }
