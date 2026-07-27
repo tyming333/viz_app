@@ -81,6 +81,7 @@
     panY: 0,
     drag: null,
     pan: null,
+    pendingKeypointPlacement: null,
     showBoxes: true,
     showBoxFill: true,
     showKeypoints: true,
@@ -456,16 +457,6 @@
     return name === undefined || name === null || name === "" ? getDefaultKeypointName(index) : String(name);
   }
 
-  function getObjectCenter(obj) {
-    const points = bboxToPoints(obj.bbox);
-    const xs = points.map(function getX(point) { return point[0]; });
-    const ys = points.map(function getY(point) { return point[1]; });
-    return [
-      Math.round((Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2),
-      Math.round((Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2)
-    ];
-  }
-
   function clampZoom(value) {
     return Math.max(0.1, Math.min(4, value));
   }
@@ -789,6 +780,7 @@
     els.deleteObjectBtn.disabled = !obj;
     els.addKeypointBtn.disabled = !obj;
     els.labelsEditor.value = obj ? (obj.labels || []).join("\n") : "";
+    renderKeypointPlacementButton();
 
     const fragment = document.createDocumentFragment();
     pointNames.forEach(function eachPoint(name, index) {
@@ -854,6 +846,20 @@
       fragment.appendChild(row);
     });
     els.keypointList.replaceChildren(fragment);
+  }
+
+  function isKeypointPlacementPending() {
+    const request = state.pendingKeypointPlacement;
+    return !!request && request.image === state.currentImage && request.objectIndex === state.selectedObjectIndex;
+  }
+
+  function renderKeypointPlacementButton() {
+    const pending = isKeypointPlacementPending();
+    els.addKeypointBtn.textContent = pending ? "取消放点" : "新增点";
+    els.addKeypointBtn.classList.toggle("active", pending);
+    els.addKeypointBtn.setAttribute("aria-pressed", String(pending));
+    els.addKeypointBtn.title = pending ? "取消图像点击放点" : "在图像上点击选择新关键点位置";
+    els.canvasShell.classList.toggle("is-placing-keypoint", pending);
   }
 
   function renderImageInfo() {
@@ -1238,6 +1244,7 @@
     }
 
     cancelDeferredRender();
+    state.pendingKeypointPlacement = null;
     state.currentImage = nextName;
     state.currentImageIndex = nextName ? state.imageNames.indexOf(nextName) : -1;
     state.selectedObjectIndex = -1;
@@ -1273,6 +1280,9 @@
   }
 
   function selectObject(index) {
+    if (state.pendingKeypointPlacement && state.pendingKeypointPlacement.objectIndex !== index) {
+      state.pendingKeypointPlacement = null;
+    }
     state.selectedObjectIndex = index;
     objectListView.rerender(state.selectedObjectIndex);
     renderEditor();
@@ -1353,15 +1363,56 @@
   function addKeypoint() {
     const obj = currentObject();
     if (!obj) return;
+    if (isKeypointPlacementPending()) {
+      state.pendingKeypointPlacement = null;
+      renderKeypointPlacementButton();
+      setStatus("已取消新增关键点", 100);
+      return;
+    }
+    state.pendingKeypointPlacement = {
+      image: state.currentImage,
+      objectIndex: state.selectedObjectIndex
+    };
+    renderKeypointPlacementButton();
+    setStatus("请在图像上点击，选择新关键点的位置", 100);
+  }
+
+  function placePendingKeypoint(imageX, imageY) {
+    const request = state.pendingKeypointPlacement;
+    if (!request) return false;
+    if (request.image !== state.currentImage || request.objectIndex !== state.selectedObjectIndex) {
+      state.pendingKeypointPlacement = null;
+      renderKeypointPlacementButton();
+      return false;
+    }
+
+    const width = els.mainImage.naturalWidth || 0;
+    const height = els.mainImage.naturalHeight || 0;
+    if (imageX < 0 || imageY < 0 || imageX > width || imageY > height) {
+      setStatus("请在图像范围内点击放置关键点", 0);
+      return true;
+    }
+
+    const obj = currentObjects()[request.objectIndex];
+    if (!obj) {
+      state.pendingKeypointPlacement = null;
+      renderKeypointPlacementButton();
+      setStatus("目标 object 已不存在，已取消新增关键点", 0);
+      return true;
+    }
+
     const keypoints = ensureObjectKeypoints(obj);
     let pointIndex = keypoints.points.findIndex(isMissingKeypoint);
     if (pointIndex < 0) pointIndex = keypoints.points.length;
-    keypoints.points[pointIndex] = getObjectCenter(obj);
+    keypoints.points[pointIndex] = [Math.round(imageX), Math.round(imageY)];
     if (!keypoints.names[pointIndex]) keypoints.names[pointIndex] = getDefaultKeypointName(pointIndex);
+    state.selectedObjectIndex = request.objectIndex;
+    state.pendingKeypointPlacement = null;
     refreshImageMeta(state.currentImage);
     renderImageControls();
-    setStatus("已新增关键点，可拖动或直接修改坐标", 100);
+    setStatus("已新增关键点", 100);
     renderAll();
+    return true;
   }
 
   function deleteKeypoint(pointIndex) {
@@ -1462,6 +1513,11 @@
 
   function startPan(event) {
     if (event.button !== 0 || state.drag || !state.currentImage) return;
+    if (isKeypointPlacementPending()) {
+      if (event.target.closest && event.target.closest("button, input, textarea, select")) return;
+      event.preventDefault();
+      return;
+    }
     const coords = getImageCoordsFromClient(event.clientX, event.clientY);
     const keypointIndex = state.showKeypoints ? findKeypointHit(coords.x, coords.y) : -1;
     if (keypointIndex >= 0) {
@@ -1747,6 +1803,7 @@
     }
     if (!state.currentImage) return;
     const coords = getImageCoordsFromClient(event.clientX, event.clientY);
+    if (placePendingKeypoint(coords.x, coords.y)) return;
     const hitIndex = pickObjectAtPoint(coords.x, coords.y);
     if (hitIndex >= 0) {
       selectObject(hitIndex);

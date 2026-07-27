@@ -462,6 +462,10 @@ textarea {
   cursor: grabbing;
 }
 
+.canvas-shell.is-placing-keypoint {
+  cursor: crosshair;
+}
+
 .stage {
   position: relative;
   width: max-content;
