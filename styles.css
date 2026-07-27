@@ -580,6 +580,63 @@ textarea {
   padding: 0 8px;
 }
 
+.keypoint-editor {
+  margin-bottom: 10px;
+}
+
+.keypoint-editor-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.keypoint-editor-title button {
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.keypoint-list {
+  display: flex;
+  max-height: 210px;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.keypoint-empty {
+  padding: 7px 8px;
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.keypoint-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(56px, 0.7fr) minmax(56px, 0.7fr) 28px;
+  align-items: center;
+  gap: 5px;
+}
+
+.keypoint-row input {
+  height: 28px;
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.keypoint-row button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--danger);
+}
+
 #labelsEditor {
   min-height: 84px;
 }
@@ -643,7 +700,12 @@ textarea {
   .image-picker-controls,
   .filter-range-grid,
   .range-inputs,
-  .bbox-grid {
+  .bbox-grid,
+  .keypoint-row {
     grid-template-columns: 1fr;
+  }
+
+  .keypoint-row button {
+    width: 100%;
   }
 }

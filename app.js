@@ -58,6 +58,8 @@
     bboxSizeText: document.getElementById("bboxSizeText"),
     labelsEditor: document.getElementById("labelsEditor"),
     bboxGrid: document.getElementById("bboxGrid"),
+    addKeypointBtn: document.getElementById("addKeypointBtn"),
+    keypointList: document.getElementById("keypointList"),
     applyObjectBtn: document.getElementById("applyObjectBtn")
   };
 
@@ -436,6 +438,34 @@
     return obj.keypoints.names[index];
   }
 
+  function getDefaultKeypointName(index) {
+    return "p" + (index + 1);
+  }
+
+  function ensureObjectKeypoints(obj) {
+    if (!obj.keypoints || typeof obj.keypoints !== "object" || Array.isArray(obj.keypoints)) {
+      obj.keypoints = { names: [], format: "xy", points: [] };
+    }
+    if (!Array.isArray(obj.keypoints.points)) obj.keypoints.points = [];
+    if (!Array.isArray(obj.keypoints.names)) obj.keypoints.names = [];
+    return obj.keypoints;
+  }
+
+  function getKeypointEditorName(obj, index) {
+    const name = getObjectKeypointName(obj, index);
+    return name === undefined || name === null || name === "" ? getDefaultKeypointName(index) : String(name);
+  }
+
+  function getObjectCenter(obj) {
+    const points = bboxToPoints(obj.bbox);
+    const xs = points.map(function getX(point) { return point[0]; });
+    const ys = points.map(function getY(point) { return point[1]; });
+    return [
+      Math.round((Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2),
+      Math.round((Math.min.apply(null, ys) + Math.max.apply(null, ys)) / 2)
+    ];
+  }
+
   function clampZoom(value) {
     return Math.max(0.1, Math.min(4, value));
   }
@@ -757,6 +787,7 @@
     els.labelsEditor.disabled = !obj;
     els.applyObjectBtn.disabled = !obj;
     els.deleteObjectBtn.disabled = !obj;
+    els.addKeypointBtn.disabled = !obj;
     els.labelsEditor.value = obj ? (obj.labels || []).join("\n") : "";
 
     const fragment = document.createDocumentFragment();
@@ -776,6 +807,53 @@
       fragment.appendChild(label);
     });
     els.bboxGrid.replaceChildren(fragment);
+    renderKeypointEditor(obj);
+  }
+
+  function renderKeypointEditor(obj) {
+    const fragment = document.createDocumentFragment();
+    const keypoints = obj ? getObjectKeypointPoints(obj) : [];
+    if (!obj || !keypoints.length) {
+      const empty = document.createElement("div");
+      empty.className = "keypoint-empty";
+      empty.textContent = obj ? "暂无关键点，可通过“新增点”创建" : "未选中";
+      fragment.appendChild(empty);
+      els.keypointList.replaceChildren(fragment);
+      return;
+    }
+
+    keypoints.forEach(function eachKeypoint(keypoint) {
+      const row = document.createElement("div");
+      const nameInput = document.createElement("input");
+      const xInput = document.createElement("input");
+      const yInput = document.createElement("input");
+      const deleteBtn = document.createElement("button");
+      row.className = "keypoint-row";
+      row.dataset.keypointIndex = String(keypoint.index);
+
+      nameInput.type = "text";
+      nameInput.value = getKeypointEditorName(obj, keypoint.index);
+      nameInput.setAttribute("aria-label", "关键点名称");
+      nameInput.dataset.keypointField = "name";
+
+      [xInput, yInput].forEach(function configureCoord(input, coordIndex) {
+        input.type = "number";
+        input.step = "1";
+        input.value = String(keypoint.point[coordIndex]);
+        input.setAttribute("aria-label", coordIndex === 0 ? "关键点 X 坐标" : "关键点 Y 坐标");
+        input.dataset.keypointField = coordIndex === 0 ? "x" : "y";
+      });
+
+      deleteBtn.type = "button";
+      deleteBtn.textContent = "x";
+      deleteBtn.title = "删除关键点";
+      deleteBtn.setAttribute("aria-label", "删除关键点");
+      deleteBtn.dataset.keypointAction = "delete";
+
+      row.append(nameInput, xInput, yInput, deleteBtn);
+      fragment.appendChild(row);
+    });
+    els.keypointList.replaceChildren(fragment);
   }
 
   function renderImageInfo() {
@@ -916,6 +994,20 @@
       if (Math.sqrt(dx * dx + dy * dy) <= threshold) {
         return i;
       }
+    }
+    return -1;
+  }
+
+  function findKeypointHit(imageX, imageY) {
+    const obj = currentObject();
+    if (!obj) return -1;
+    const threshold = 9 / getOverlayScale();
+    const keypoints = getObjectKeypointPoints(obj);
+    for (let i = 0; i < keypoints.length; i += 1) {
+      const keypoint = keypoints[i];
+      const dx = keypoint.point[0] - imageX;
+      const dy = keypoint.point[1] - imageY;
+      if (Math.sqrt(dx * dx + dy * dy) <= threshold) return keypoint.index;
     }
     return -1;
   }
@@ -1197,6 +1289,19 @@
     });
   }
 
+  function updateEditorKeypointInputs(keypointIndex) {
+    const obj = currentObject();
+    if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return;
+    const point = obj.keypoints.points[keypointIndex];
+    if (isMissingKeypoint(point)) return;
+    const row = els.keypointList.querySelector('[data-keypoint-index="' + keypointIndex + '"]');
+    if (!row) return;
+    const xInput = row.querySelector('[data-keypoint-field="x"]');
+    const yInput = row.querySelector('[data-keypoint-field="y"]');
+    if (xInput) xInput.value = String(point[0]);
+    if (yInput) yInput.value = String(point[1]);
+  }
+
   function applyEditor() {
     const obj = currentObject();
     if (!obj) return;
@@ -1219,6 +1324,55 @@
     refreshImageMeta(state.currentImage);
     renderImageControls();
     setStatus("已应用修改", 100);
+    renderAll();
+  }
+
+  function applyKeypointEditor() {
+    const obj = currentObject();
+    if (!obj) return;
+    const keypoints = ensureObjectKeypoints(obj);
+    const rows = Array.from(els.keypointList.querySelectorAll(".keypoint-row"));
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i];
+      const pointIndex = Number(row.dataset.keypointIndex);
+      const x = Number(row.querySelector('[data-keypoint-field="x"]').value);
+      const y = Number(row.querySelector('[data-keypoint-field="y"]').value);
+      if (!Number.isInteger(pointIndex) || !Number.isFinite(x) || !Number.isFinite(y)) {
+        setStatus("关键点坐标必须是有效数字", 0);
+        return;
+      }
+      keypoints.points[pointIndex] = [x, y];
+      const name = row.querySelector('[data-keypoint-field="name"]').value.trim();
+      keypoints.names[pointIndex] = name || getDefaultKeypointName(pointIndex);
+    }
+    refreshImageMeta(state.currentImage);
+    setStatus("已应用关键点修改", 100);
+    renderOverlay();
+  }
+
+  function addKeypoint() {
+    const obj = currentObject();
+    if (!obj) return;
+    const keypoints = ensureObjectKeypoints(obj);
+    let pointIndex = keypoints.points.findIndex(isMissingKeypoint);
+    if (pointIndex < 0) pointIndex = keypoints.points.length;
+    keypoints.points[pointIndex] = getObjectCenter(obj);
+    if (!keypoints.names[pointIndex]) keypoints.names[pointIndex] = getDefaultKeypointName(pointIndex);
+    refreshImageMeta(state.currentImage);
+    renderImageControls();
+    setStatus("已新增关键点，可拖动或直接修改坐标", 100);
+    renderAll();
+  }
+
+  function deleteKeypoint(pointIndex) {
+    const obj = currentObject();
+    if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return;
+    if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= obj.keypoints.points.length) return;
+    // Keep the original slot so fixed-index keypoint names remain aligned.
+    obj.keypoints.points[pointIndex] = ["null"];
+    refreshImageMeta(state.currentImage);
+    renderImageControls();
+    setStatus("已删除关键点", 100);
     renderAll();
   }
 
@@ -1309,10 +1463,17 @@
   function startPan(event) {
     if (event.button !== 0 || state.drag || !state.currentImage) return;
     const coords = getImageCoordsFromClient(event.clientX, event.clientY);
+    const keypointIndex = state.showKeypoints ? findKeypointHit(coords.x, coords.y) : -1;
+    if (keypointIndex >= 0) {
+      event.preventDefault();
+      state.drag = { kind: "keypoint", objectIndex: state.selectedObjectIndex, pointIndex: keypointIndex };
+      els.canvasShell.setPointerCapture(event.pointerId);
+      return;
+    }
     const handleIndex = findHandleHit(coords.x, coords.y);
     if (handleIndex >= 0) {
       event.preventDefault();
-      state.drag = { objectIndex: state.selectedObjectIndex, pointIndex: handleIndex };
+      state.drag = { kind: "bbox", objectIndex: state.selectedObjectIndex, pointIndex: handleIndex };
       els.canvasShell.setPointerCapture(event.pointerId);
       return;
     }
@@ -1343,6 +1504,13 @@
       const obj = currentObjects()[state.drag.objectIndex];
       if (!obj) return;
       const coords = getImageCoordsFromClient(event.clientX, event.clientY);
+      if (state.drag.kind === "keypoint") {
+        const keypoints = ensureObjectKeypoints(obj);
+        keypoints.points[state.drag.pointIndex] = [Math.round(coords.x), Math.round(coords.y)];
+        updateEditorKeypointInputs(state.drag.pointIndex);
+        renderOverlay();
+        return;
+      }
       const base = state.drag.pointIndex * 2;
       obj.bbox[base] = Math.round(coords.x);
       obj.bbox[base + 1] = Math.round(coords.y);
@@ -1556,8 +1724,16 @@
   });
   els.addObjectBtn.addEventListener("click", addObject);
   els.deleteObjectBtn.addEventListener("click", deleteObject);
+  els.addKeypointBtn.addEventListener("click", addKeypoint);
   els.applyObjectBtn.addEventListener("click", applyEditor);
   els.labelsEditor.addEventListener("change", applyEditor);
+  els.keypointList.addEventListener("change", applyKeypointEditor);
+  els.keypointList.addEventListener("click", function onkeypointaction(event) {
+    const button = event.target.closest("[data-keypoint-action]");
+    if (!button || button.dataset.keypointAction !== "delete") return;
+    const row = button.closest("[data-keypoint-index]");
+    if (row) deleteKeypoint(Number(row.dataset.keypointIndex));
+  });
   els.canvasShell.addEventListener("wheel", wheelZoom, { passive: false });
   els.canvasShell.addEventListener("pointerdown", startPan);
   els.canvasShell.addEventListener("pointermove", movePan);
