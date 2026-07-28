@@ -51,7 +51,8 @@
     zoomInBtn: document.getElementById("zoomInBtn"),
     zoomText: document.getElementById("zoomText"),
     objectCount: document.getElementById("objectCount"),
-    addObjectBtn: document.getElementById("addObjectBtn"),
+    addRectangleBtn: document.getElementById("addRectangleBtn"),
+    addQuadrilateralBtn: document.getElementById("addQuadrilateralBtn"),
     deleteObjectBtn: document.getElementById("deleteObjectBtn"),
     objectList: document.getElementById("objectList"),
     selectedBadge: document.getElementById("selectedBadge"),
@@ -424,6 +425,27 @@
     ];
   }
 
+  // Older annotations have no type marker and retain the original free four-point behavior.
+  function getObjectBoxType(obj) {
+    return obj && obj.attrs && obj.attrs.box_type === "rectangle" ? "rectangle" : "quadrilateral";
+  }
+
+  function setRectangleHandlePosition(bbox, handleIndex, x, y) {
+    const points = bboxToPoints(bbox);
+    const opposite = points[(handleIndex + 2) % 4];
+    const left = Math.min(x, opposite[0]);
+    const right = Math.max(x, opposite[0]);
+    const top = Math.min(y, opposite[1]);
+    const bottom = Math.max(y, opposite[1]);
+    return [left, top, right, top, right, bottom, left, bottom];
+  }
+
+  function translateBbox(bbox, dx, dy) {
+    return bbox.map(function translateCoordinate(value, index) {
+      return Math.round(value + (index % 2 === 0 ? dx : dy));
+    });
+  }
+
   function getObjectKeypointPoints(obj) {
     if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return [];
     return obj.keypoints.points.reduce(function collectKeypoints(result, point, index) {
@@ -763,7 +785,8 @@
     const labels = objects.map(function formatObjectLabel(obj, index) {
       const text = Array.isArray(obj.labels) && obj.labels.length ? obj.labels.join(" / ") : "未命名";
       const keypointCount = getObjectKeypointPoints(obj).length;
-      const suffix = keypointCount ? " · " + keypointCount + " pts" : "";
+      const type = getObjectBoxType(obj) === "rectangle" ? "矩形" : "四点框";
+      const suffix = " · " + type + (keypointCount ? " · " + keypointCount + " pts" : "");
       return (text || "object " + (index + 1)) + suffix;
     });
     els.objectCount.textContent = String(objects.length);
@@ -1427,7 +1450,7 @@
     renderAll();
   }
 
-  function addObject() {
+  function addObject(boxType) {
     if (!state.currentImage || !state.data) return;
     const width = els.mainImage.naturalWidth || 200;
     const height = els.mainImage.naturalHeight || 160;
@@ -1439,12 +1462,13 @@
     objects.push({
       labels: ["new_object"],
       bbox: [left, top, right, top, right, bottom, left, bottom],
-      attrs: {}
+      // box_type controls vertex editing: rectangle keeps perpendicular edges, quadrilateral is free-form.
+      attrs: { box_type: boxType }
     });
     state.selectedObjectIndex = objects.length - 1;
     refreshImageMeta(state.currentImage);
     renderImageControls();
-    setStatus("已新增 object", 100);
+    setStatus(boxType === "rectangle" ? "已新增矩形框" : "已新增四点框", 100);
     renderAll();
   }
 
@@ -1537,7 +1561,18 @@
     const hitIndex = pickObjectAtPoint(coords.x, coords.y);
     if (hitIndex >= 0) {
       event.preventDefault();
-      selectObject(hitIndex);
+      if (hitIndex !== state.selectedObjectIndex) {
+        selectObject(hitIndex);
+        return;
+      }
+      state.drag = {
+        kind: "object",
+        objectIndex: hitIndex,
+        startX: coords.x,
+        startY: coords.y,
+        bbox: currentObjects()[hitIndex].bbox.slice()
+      };
+      els.canvasShell.setPointerCapture(event.pointerId);
       return;
     }
 
@@ -1567,9 +1602,15 @@
         renderOverlay();
         return;
       }
-      const base = state.drag.pointIndex * 2;
-      obj.bbox[base] = Math.round(coords.x);
-      obj.bbox[base + 1] = Math.round(coords.y);
+      if (state.drag.kind === "object") {
+        obj.bbox = translateBbox(state.drag.bbox, coords.x - state.drag.startX, coords.y - state.drag.startY);
+      } else if (getObjectBoxType(obj) === "rectangle") {
+        obj.bbox = setRectangleHandlePosition(obj.bbox, state.drag.pointIndex, Math.round(coords.x), Math.round(coords.y));
+      } else {
+        const base = state.drag.pointIndex * 2;
+        obj.bbox[base] = Math.round(coords.x);
+        obj.bbox[base + 1] = Math.round(coords.y);
+      }
       updateEditorBboxInputs();
       els.bboxSizeText.textContent = formatBboxSize(obj.bbox);
       renderOverlay();
@@ -1778,7 +1819,12 @@
     const rect = els.canvasShell.getBoundingClientRect();
     zoomAt(rect.left + els.canvasShell.clientWidth / 2, rect.top + els.canvasShell.clientHeight / 2, state.zoom + 0.1);
   });
-  els.addObjectBtn.addEventListener("click", addObject);
+  els.addRectangleBtn.addEventListener("click", function addRectangle() {
+    addObject("rectangle");
+  });
+  els.addQuadrilateralBtn.addEventListener("click", function addQuadrilateral() {
+    addObject("quadrilateral");
+  });
   els.deleteObjectBtn.addEventListener("click", deleteObject);
   els.addKeypointBtn.addEventListener("click", addKeypoint);
   els.applyObjectBtn.addEventListener("click", applyEditor);
