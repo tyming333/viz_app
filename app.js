@@ -42,6 +42,8 @@
     labelSizeText: document.getElementById("labelSizeText"),
     brightnessRange: document.getElementById("brightnessRange"),
     brightnessText: document.getElementById("brightnessText"),
+    contrastRange: document.getElementById("contrastRange"),
+    contrastText: document.getElementById("contrastText"),
     imageInfoIndex: document.getElementById("imageInfoIndex"),
     imageInfoSize: document.getElementById("imageInfoSize"),
     imageInfoObjects: document.getElementById("imageInfoObjects"),
@@ -90,6 +92,7 @@
     boxStrokeWidth: 3,
     labelFontSize: 13,
     imageBrightness: 100,
+    imageContrast: 100,
     viewFrame: 0,
     overlayFrame: 0,
     imageListScrollFrame: 0,
@@ -484,7 +487,11 @@
   }
 
   function clampBrightness(value) {
-    return Math.max(60, Math.min(220, value));
+    return Math.max(0, Math.min(600, value));
+  }
+
+  function clampContrast(value) {
+    return Math.max(0, Math.min(600, value));
   }
 
   function getVisibleImageNames() {
@@ -913,6 +920,8 @@
     els.labelSizeText.textContent = String(state.labelFontSize);
     els.brightnessRange.value = String(state.imageBrightness);
     els.brightnessText.textContent = Math.round(state.imageBrightness) + "%";
+    els.contrastRange.value = String(state.imageContrast);
+    els.contrastText.textContent = Math.round(state.imageContrast) + "%";
   }
 
   function renderBoxVisibilityToggle() {
@@ -1490,8 +1499,10 @@
     renderOverlay();
   }
 
-  function applyImageBrightness() {
-    els.mainImage.style.filter = "brightness(" + (state.imageBrightness / 100).toFixed(2) + ")";
+  function applyImageAdjustments() {
+    els.mainImage.style.filter =
+      "brightness(" + (state.imageBrightness / 100).toFixed(2) + ") " +
+      "contrast(" + (state.imageContrast / 100).toFixed(2) + ")";
   }
 
   function applyZoom() {
@@ -1809,7 +1820,12 @@
   els.brightnessRange.addEventListener("input", function oninput(event) {
     state.imageBrightness = clampBrightness(Number(event.target.value) || 100);
     renderSliderValues();
-    applyImageBrightness();
+    applyImageAdjustments();
+  });
+  els.contrastRange.addEventListener("input", function oninput(event) {
+    state.imageContrast = clampContrast(Number(event.target.value) || 100);
+    renderSliderValues();
+    applyImageAdjustments();
   });
   els.zoomOutBtn.addEventListener("click", function onzoomout() {
     const rect = els.canvasShell.getBoundingClientRect();
@@ -1873,5 +1889,5 @@
   });
 
   renderFull();
-  applyImageBrightness();
+  applyImageAdjustments();
 })();
