@@ -42,16 +42,15 @@
     labelSizeText: document.getElementById("labelSizeText"),
     brightnessRange: document.getElementById("brightnessRange"),
     brightnessText: document.getElementById("brightnessText"),
+    resetBrightnessBtn: document.getElementById("resetBrightnessBtn"),
     contrastRange: document.getElementById("contrastRange"),
     contrastText: document.getElementById("contrastText"),
+    resetContrastBtn: document.getElementById("resetContrastBtn"),
     imageInfoIndex: document.getElementById("imageInfoIndex"),
     imageInfoSize: document.getElementById("imageInfoSize"),
     imageInfoObjects: document.getElementById("imageInfoObjects"),
     imageInfoZoom: document.getElementById("imageInfoZoom"),
     imageInfoCreated: document.getElementById("imageInfoCreated"),
-    zoomOutBtn: document.getElementById("zoomOutBtn"),
-    zoomInBtn: document.getElementById("zoomInBtn"),
-    zoomText: document.getElementById("zoomText"),
     objectCount: document.getElementById("objectCount"),
     addRectangleBtn: document.getElementById("addRectangleBtn"),
     addQuadrilateralBtn: document.getElementById("addQuadrilateralBtn"),
@@ -1494,8 +1493,7 @@
 
   function applyViewTransform() {
     els.stage.style.transform = "translate(" + state.panX + "px, " + state.panY + "px) scale(" + state.zoom + ")";
-    els.zoomText.textContent = Math.round(state.zoom * 100) + "%";
-    els.imageInfoZoom.textContent = els.zoomText.textContent;
+    els.imageInfoZoom.textContent = Math.round(state.zoom * 100) + "%";
     renderOverlay();
   }
 
@@ -1822,18 +1820,20 @@
     renderSliderValues();
     applyImageAdjustments();
   });
+  els.resetBrightnessBtn.addEventListener("click", function onresetbrightness() {
+    state.imageBrightness = 100;
+    renderSliderValues();
+    applyImageAdjustments();
+  });
   els.contrastRange.addEventListener("input", function oninput(event) {
     state.imageContrast = clampContrast(Number(event.target.value) || 100);
     renderSliderValues();
     applyImageAdjustments();
   });
-  els.zoomOutBtn.addEventListener("click", function onzoomout() {
-    const rect = els.canvasShell.getBoundingClientRect();
-    zoomAt(rect.left + els.canvasShell.clientWidth / 2, rect.top + els.canvasShell.clientHeight / 2, state.zoom - 0.1);
-  });
-  els.zoomInBtn.addEventListener("click", function onzoomin() {
-    const rect = els.canvasShell.getBoundingClientRect();
-    zoomAt(rect.left + els.canvasShell.clientWidth / 2, rect.top + els.canvasShell.clientHeight / 2, state.zoom + 0.1);
+  els.resetContrastBtn.addEventListener("click", function onresetcontrast() {
+    state.imageContrast = 100;
+    renderSliderValues();
+    applyImageAdjustments();
   });
   els.addRectangleBtn.addEventListener("click", function addRectangle() {
     addObject("rectangle");

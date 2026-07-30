@@ -415,6 +415,22 @@ textarea {
   cursor: pointer;
 }
 
+.toolbar-reset {
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.toolbar-reset:hover,
+.toolbar-reset:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .toolbar-slider output,
 .toolbar-actions output {
   min-width: 30px;
