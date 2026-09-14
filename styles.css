@@ -162,7 +162,8 @@ textarea {
 }
 
 .import-panel {
-  min-height: 410px;
+  /* 去掉 JSON 文本框后收紧导入区，让图片列表获得更多垂直空间。 */
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -198,11 +199,6 @@ textarea {
 .field.fill {
   flex: 1;
   min-height: 0;
-}
-
-#jsonInput {
-  flex: 1;
-  min-height: 180px;
 }
 
 .panel-title {
@@ -255,6 +251,42 @@ textarea {
   margin-bottom: 10px;
 }
 
+.filter-layout {
+  display: block;
+}
+
+.filter-text-row {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-text-row input {
+  min-width: 0;
+  flex: 1;
+  height: 27px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.filter-stack > input,
+.range-inputs input {
+  height: 27px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.filter-note #imageCount {
+  min-width: 0;
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
+.filter-actions button {
+  min-height: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
 .filter-range-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -291,12 +323,15 @@ textarea {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
 }
 
 .filter-note button {
   min-height: 26px;
   padding: 0 8px;
   font-size: 11px;
+  flex: 0 0 auto;
 }
 
 .virtual-list {
@@ -323,14 +358,34 @@ textarea {
   position: absolute;
   left: 0;
   right: 0;
-  height: 38px;
-  padding: 4px;
+  height: 27px;
+  padding: 1px;
+  display: flex;
+  align-items: center;
+}
+
+.virtual-row .image-check {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  margin: 0 3px 0 1px;
+}
+
+.virtual-row button {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .virtual-row button {
   width: 100%;
-  min-height: 30px;
-  height: 30px;
+  min-height: 23px;
+  height: 23px;
+  font-size: 11px;
+  border-color: color-mix(in srgb, var(--line) 45%, transparent);
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;

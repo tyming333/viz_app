@@ -15,6 +15,7 @@
       <div class="actions">
         <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
         <button id="downloadJsonBtn" type="button" title="导出当前 JSON">导出 JSON</button>
+        <button id="exportSelectedBtn" type="button" title="导出勾选的图片和 JSON">选择导出</button>
       </div>
     </header>
 
@@ -29,18 +30,8 @@
             <span>导入 JSON 文件</span>
             <input id="jsonFileInput" type="file" accept=".json,application/json" />
           </label>
-          <label class="field fill">
-            <span>JSON 文本</span>
-            <textarea
-              id="jsonInput"
-              spellcheck="false"
-              placeholder='{"image.jpg":{"det":{"objects":[{"labels":["class_name"],"bbox":[10,10,100,10,100,80,10,80],"attrs":{}}]}}}'
-            ></textarea>
-          </label>
-          <div class="row">
-            <button id="loadBtn" type="button">加载数据</button>
-            <button id="formatBtn" type="button">格式化</button>
-          </div>
+          <!-- 保留隐藏的数据载体，供文件导入、解析和导出流程使用；不在左侧显示 JSON 文本框。 -->
+          <input id="jsonInput" type="hidden" />
           <div class="progress" aria-hidden="true">
             <div id="progressBar"></div>
           </div>
@@ -50,11 +41,13 @@
         <section class="panel list-panel">
           <div class="panel-title">
             <strong>图片</strong>
-            <span id="imageCount">0</span>
           </div>
-          <div class="filter-stack">
-            <input id="imageFilter" type="search" placeholder="筛选图片名" />
-            <input id="labelFilter" type="search" placeholder="筛选 labels" />
+          <div class="filter-layout">
+            <div class="filter-stack">
+              <div class="filter-text-row">
+              <input id="imageFilter" type="search" placeholder="筛选图片名" />
+              <input id="labelFilter" type="search" placeholder="筛选 labels" />
+              </div>
             <div class="filter-range-grid">
               <label class="range-field">
                 <span>宽度</span>
@@ -71,13 +64,16 @@
                 </div>
               </label>
             </div>
-            <div class="filter-note">
-              <span id="knownSizeText">宽高筛选基于已知图像尺寸 0/0</span>
-              <div class="filter-actions">
-                <button id="applyFiltersBtn" type="button">确定</button>
-                <button id="clearFiltersBtn" type="button">清空</button>
+              <div class="filter-note">
+                <span id="knownSizeText">宽高筛选基于已知图像尺寸 0/0</span>
+                <div class="filter-actions">
+                  <button id="applyFiltersBtn" type="button">确定</button>
+                  <button id="clearFiltersBtn" type="button">清空</button>
+                  <span id="imageCount" aria-label="筛选结果数量">0</span>
+                </div>
               </div>
             </div>
+          </div>
           </div>
           <div id="imageList" class="virtual-list" aria-label="image list"></div>
         </section>

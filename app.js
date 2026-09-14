@@ -5,10 +5,9 @@
     prefixInput: document.getElementById("prefixInput"),
     jsonFileInput: document.getElementById("jsonFileInput"),
     jsonInput: document.getElementById("jsonInput"),
-    loadBtn: document.getElementById("loadBtn"),
-    formatBtn: document.getElementById("formatBtn"),
     copyJsonBtn: document.getElementById("copyJsonBtn"),
     downloadJsonBtn: document.getElementById("downloadJsonBtn"),
+    exportSelectedBtn: document.getElementById("exportSelectedBtn"),
     progressBar: document.getElementById("progressBar"),
     statusText: document.getElementById("statusText"),
     imageCount: document.getElementById("imageCount"),
@@ -73,6 +72,14 @@
     data: null,
     imageNames: [],
     filteredImageNames: [],
+    appliedFilters: {
+      image: "",
+      label: "",
+      widthMin: "",
+      widthMax: "",
+      heightMin: "",
+      heightMax: ""
+    },
     imageMeta: new Map(),
     knownImageSizes: new Map(),
     currentImage: "",
@@ -100,7 +107,8 @@
     sizeScanJobId: 0,
     sizeScanActive: false,
     sizeScanCompleted: 0,
-    sizeScanTotal: 0
+    sizeScanTotal: 0,
+    selectedImages: new Set()
   };
 
   const preloadImages = new Map();
@@ -224,6 +232,12 @@
         const row = document.createElement("div");
         row.className = "virtual-row";
         row.style.top = i * view.itemHeight + "px";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "image-check";
+        checkbox.checked = state.selectedImages.has(view.items[i]);
+        checkbox.dataset.imageIndex = String(i);
+        checkbox.title = "勾选导出图片";
         const button = document.createElement("button");
         button.type = "button";
         button.dataset[view.buttonDatasetKey] = String(i);
@@ -232,6 +246,7 @@
         if (i === view.selectedIndex) {
           button.classList.add("active");
         }
+        row.appendChild(checkbox);
         row.appendChild(button);
         fragment.appendChild(row);
       }
@@ -269,7 +284,7 @@
     };
   }
 
-  const imageListView = createVirtualList(els.imageList, 38, "imageIndex", function getImageLabel(item) {
+  const imageListView = createVirtualList(els.imageList, 27, "imageIndex", function getImageLabel(item) {
     return item;
   });
 
@@ -494,12 +509,13 @@
   }
 
   function getVisibleImageNames() {
-    const nameFilter = els.imageFilter.value.trim().toLowerCase();
-    const labelFilter = els.labelFilter.value.trim().toLowerCase();
-    const widthMin = parseFilterNumber(els.widthMinFilter);
-    const widthMax = parseFilterNumber(els.widthMaxFilter);
-    const heightMin = parseFilterNumber(els.heightMinFilter);
-    const heightMax = parseFilterNumber(els.heightMaxFilter);
+    const filters = state.appliedFilters;
+    const nameFilter = filters.image.trim().toLowerCase();
+    const labelFilter = filters.label.trim().toLowerCase();
+    const widthMin = filters.widthMin === "" ? null : Number(filters.widthMin);
+    const widthMax = filters.widthMax === "" ? null : Number(filters.widthMax);
+    const heightMin = filters.heightMin === "" ? null : Number(filters.heightMin);
+    const heightMax = filters.heightMax === "" ? null : Number(filters.heightMax);
 
     return state.imageNames.filter(function filterImage(name) {
       const meta = state.imageMeta.get(name);
@@ -623,10 +639,19 @@
     els.widthMaxFilter.value = "";
     els.heightMinFilter.value = "";
     els.heightMaxFilter.value = "";
+    state.appliedFilters = { image: "", label: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
     renderImageControls();
   }
 
   function applyFilters() {
+    state.appliedFilters = {
+      image: els.imageFilter.value,
+      label: els.labelFilter.value,
+      widthMin: els.widthMinFilter.value,
+      widthMax: els.widthMaxFilter.value,
+      heightMin: els.heightMinFilter.value,
+      heightMax: els.heightMaxFilter.value
+    };
     renderImageControls();
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
@@ -709,6 +734,7 @@
     state.currentImage = "";
     state.currentImageIndex = -1;
     state.selectedObjectIndex = -1;
+    state.selectedImages.clear();
     const firstImage = state.imageNames[0] || "";
     setStatus("已加载 " + state.imageNames.length + " 张图片，" + payload.objectTotal + " 个 objects", 70);
     renderImageControls();
@@ -751,6 +777,7 @@
       state.currentImage = "";
       state.currentImageIndex = -1;
       state.selectedObjectIndex = -1;
+      state.selectedImages.clear();
       setStatus("加载失败: " + error.message, 0);
       renderFull();
     }
@@ -1699,6 +1726,109 @@
     setStatus("已导出 JSON", 100);
   }
 
+  function toggleImageExportSelection(name, checked) {
+    if (checked) {
+      state.selectedImages.add(name);
+    } else {
+      state.selectedImages.delete(name);
+    }
+  }
+
+  function selectedExportNames() {
+    return state.imageNames.filter(function filterSelected(name) {
+      return state.selectedImages.has(name);
+    });
+  }
+
+  function safeRelativeImagePath(name) {
+    const normalized = normalizeImagePath(name).replace(/^\/+/, "");
+    const parts = normalized.split("/").filter(function keepPart(part) {
+      return part && part !== "." && part !== "..";
+    });
+    return parts.join("/");
+  }
+
+  async function readImageBlob(name, sourceDirectory) {
+    if (sourceDirectory) {
+      let directory = sourceDirectory;
+      const parts = safeRelativeImagePath(name).split("/");
+      const fileName = parts.pop();
+      for (const part of parts) {
+        directory = await directory.getDirectoryHandle(part);
+      }
+      const fileHandle = await directory.getFileHandle(fileName);
+      return fileHandle.getFile();
+    }
+    const response = await fetch(imageUrl(name));
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    return response.blob();
+  }
+
+  async function writeImageBlob(root, name, blob) {
+    let directory = await root.getDirectoryHandle("images", { create: true });
+    const parts = safeRelativeImagePath(name).split("/");
+    const fileName = parts.pop();
+    for (const part of parts) {
+      directory = await directory.getDirectoryHandle(part, { create: true });
+    }
+    const fileHandle = await directory.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+  }
+
+  async function exportSelected() {
+    const names = selectedExportNames();
+    if (!names.length) {
+      setStatus("请先勾选要导出的图片", 0);
+      return;
+    }
+    if (!window.showDirectoryPicker) {
+      setStatus("当前浏览器不支持选择目录导出，请使用 Chrome 或 Edge", 0);
+      return;
+    }
+    try {
+      const root = await window.showDirectoryPicker({ mode: "readwrite" });
+      let sourceDirectory = null;
+      const failed = [];
+      for (let index = 0; index < names.length; index += 1) {
+        const name = names[index];
+        try {
+          const blob = await readImageBlob(name, sourceDirectory);
+          await writeImageBlob(root, name, blob);
+        } catch (error) {
+          if (!sourceDirectory) {
+            sourceDirectory = await window.showDirectoryPicker({ mode: "read" });
+            try {
+              const blob = await readImageBlob(name, sourceDirectory);
+              await writeImageBlob(root, name, blob);
+            } catch (retryError) {
+              failed.push(name);
+            }
+          } else {
+            failed.push(name);
+          }
+        }
+        setStatus("正在导出图片... " + (index + 1) + "/" + names.length, Math.round(((index + 1) / names.length) * 90));
+      }
+      const exportData = {};
+      names.forEach(function copySelectedData(name) {
+        if (!failed.includes(name)) exportData[name] = state.data[name];
+      });
+      const jsonHandle = await root.getFileHandle("annotations_det_edited.json", { create: true });
+      const writable = await jsonHandle.createWritable();
+      await writable.write(JSON.stringify(exportData, null, 2));
+      await writable.close();
+      setStatus(failed.length ? "导出完成，失败 " + failed.length + " 张图片" : "导出完成，共 " + names.length + " 张图片", 100);
+    } catch (error) {
+      if (error && error.name === "AbortError") {
+        setStatus("已取消导出", 0);
+      } else {
+        setStatus("导出失败: " + (error.message || error), 0);
+      }
+    }
+  }
+
   function formatJson() {
     try {
       els.jsonInput.value = JSON.stringify(JSON.parse(els.jsonInput.value), null, 2);
@@ -1735,21 +1865,22 @@
     event.stopPropagation();
   }
 
-  els.loadBtn.addEventListener("click", loadJson);
-  els.formatBtn.addEventListener("click", formatJson);
   els.copyJsonBtn.addEventListener("click", copyJson);
   els.downloadJsonBtn.addEventListener("click", downloadJson);
+  els.exportSelectedBtn.addEventListener("click", exportSelected);
   els.jsonFileInput.addEventListener("change", function onchange(event) {
     readJsonFile(event.target.files[0]);
-  });
-  els.imageFilter.addEventListener("input", renderImageControls);
-  els.labelFilter.addEventListener("input", renderImageControls);
-  [els.widthMinFilter, els.widthMaxFilter, els.heightMinFilter, els.heightMaxFilter].forEach(function bind(input) {
-    input.addEventListener("input", renderImageControls);
   });
   els.applyFiltersBtn.addEventListener("click", applyFilters);
   els.clearFiltersBtn.addEventListener("click", clearFilters);
   els.imageList.addEventListener("click", handleImageListClick);
+  els.imageList.addEventListener("change", function onImageSelectionChange(event) {
+    const checkbox = event.target.closest ? event.target.closest("input.image-check") : null;
+    if (!checkbox) return;
+    const index = Number(checkbox.dataset.imageIndex);
+    const name = state.filteredImageNames[index];
+    if (typeof name === "string") toggleImageExportSelection(name, checkbox.checked);
+  });
   els.objectList.addEventListener("click", handleObjectListClick);
   els.prevImageBtn.addEventListener("pointerdown", stopPointerBubble);
   els.nextImageBtn.addEventListener("pointerdown", stopPointerBubble);
