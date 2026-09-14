@@ -32,6 +32,7 @@
     nextImageBtn: document.getElementById("nextImageBtn"),
     resetViewBtn: document.getElementById("resetViewBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
+    showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
     keypointVisibilityBtn: document.getElementById("keypointVisibilityBtn"),
     keypointLabelBtn: document.getElementById("keypointLabelBtn"),
@@ -368,6 +369,18 @@
 
   function currentObjects() {
     return getObjects(state.currentImage);
+  }
+
+  function visibleOverlayObjects() {
+    const objects = currentObjects();
+    const labelFilter = state.appliedFilters.label.trim().toLowerCase();
+    if (!labelFilter) return objects;
+    return objects.filter(function filterObject(obj) {
+      const labels = Array.isArray(obj.labels) ? obj.labels : [];
+      return labels.some(function matchLabel(label) {
+        return String(label || "").toLowerCase().includes(labelFilter);
+      });
+    });
   }
 
   function currentObject() {
@@ -961,6 +974,12 @@
     els.fillToggleBtn.setAttribute("aria-pressed", String(state.showBoxFill));
   }
 
+  function showAllBoxes() {
+    state.showBoxes = true;
+    renderBoxVisibilityToggle();
+    renderOverlay();
+  }
+
   function renderKeypointVisibilityToggle() {
     els.keypointVisibilityBtn.classList.toggle("active", state.showKeypoints);
     els.keypointVisibilityBtn.setAttribute("aria-pressed", String(state.showKeypoints));
@@ -1173,7 +1192,7 @@
     overlayContext.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayContext.translate(state.panX, state.panY);
     overlayContext.scale(state.zoom, state.zoom);
-    const objects = currentObjects();
+    const objects = visibleOverlayObjects();
     objects.forEach(function eachObject(obj, index) {
       const points = bboxToPoints(obj.bbox);
       const color = colors[index % colors.length];
@@ -1873,6 +1892,14 @@
   });
   els.applyFiltersBtn.addEventListener("click", applyFilters);
   els.clearFiltersBtn.addEventListener("click", clearFilters);
+  [els.imageFilter, els.labelFilter, els.widthMinFilter, els.widthMaxFilter, els.heightMinFilter, els.heightMaxFilter]
+    .forEach(function bindFilterEnter(input) {
+      input.addEventListener("keydown", function onfilterkeydown(event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        applyFilters();
+      });
+    });
   els.imageList.addEventListener("click", handleImageListClick);
   els.imageList.addEventListener("change", function onImageSelectionChange(event) {
     const checkbox = event.target.closest ? event.target.closest("input.image-check") : null;
@@ -1926,6 +1953,7 @@
     renderFillToggle();
     renderOverlay();
   });
+  els.showAllBoxesBtn.addEventListener("click", showAllBoxes);
   els.keypointVisibilityBtn.addEventListener("click", function onkeypoints() {
     state.showKeypoints = !state.showKeypoints;
     renderKeypointVisibilityToggle();
