@@ -54,9 +54,42 @@
     return Array.isArray(imageNames) && imageNames.length ? String(imageNames[0] || "") : "";
   }
 
+  function normalizeBatchGridSize(value) {
+    if (value === null || value === undefined || String(value).trim() === "") return 3;
+    const parsed = Math.floor(Number(value));
+    if (!Number.isFinite(parsed)) return 3;
+    return Math.max(2, Math.min(10, parsed));
+  }
+
+  function getBatchPreviewWindow(total, gridSize, requestedStart) {
+    const safeTotal = Math.max(0, Math.floor(Number(total) || 0));
+    const size = normalizeBatchGridSize(gridSize);
+    const capacity = size * size;
+    const maxStart = Math.max(0, safeTotal - capacity);
+    const start = Math.max(0, Math.min(maxStart, Math.floor(Number(requestedStart) || 0)));
+    const end = Math.min(safeTotal, start + capacity);
+    return {
+      start,
+      end,
+      capacity,
+      maxStart,
+      percent: safeTotal ? Math.round((end / safeTotal) * 100) : 0
+    };
+  }
+
+  function advanceBatchPreviewOffset(total, gridSize, currentStart, direction) {
+    const size = normalizeBatchGridSize(gridSize);
+    const windowState = getBatchPreviewWindow(total, size, currentStart);
+    const step = Number(direction) < 0 ? -size : size;
+    return Math.max(0, Math.min(windowState.maxStart, windowState.start + step));
+  }
+
   return {
     collectDataLabels,
     matchesLabelFilter,
-    firstFilteredImageName
+    firstFilteredImageName,
+    normalizeBatchGridSize,
+    getBatchPreviewWindow,
+    advanceBatchPreviewOffset
   };
 });

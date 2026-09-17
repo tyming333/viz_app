@@ -1,7 +1,14 @@
 ﻿(function () {
   "use strict";
 
-  const { collectDataLabels, matchesLabelFilter, firstFilteredImageName } = window.ViewerCore;
+  const {
+    collectDataLabels,
+    matchesLabelFilter,
+    firstFilteredImageName,
+    normalizeBatchGridSize,
+    getBatchPreviewWindow,
+    advanceBatchPreviewOffset
+  } = window.ViewerCore;
 
   const els = {
     prefixInput: document.getElementById("prefixInput"),
@@ -24,15 +31,21 @@
     applyFiltersBtn: document.getElementById("applyFiltersBtn"),
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
     imageList: document.getElementById("imageList"),
+    batchProgressPanel: document.getElementById("batchProgressPanel"),
+    batchProgressText: document.getElementById("batchProgressText"),
+    batchProgressRange: document.getElementById("batchProgressRange"),
     currentImageText: document.getElementById("currentImageText"),
     imageIndexText: document.getElementById("imageIndexText"),
     canvasShell: document.getElementById("canvasShell"),
     stage: document.getElementById("stage"),
     mainImage: document.getElementById("mainImage"),
+    batchPreviewGrid: document.getElementById("batchPreviewGrid"),
     overlayCanvas: document.getElementById("overlayCanvas"),
     emptyState: document.getElementById("emptyState"),
     prevImageBtn: document.getElementById("prevImageBtn"),
     nextImageBtn: document.getElementById("nextImageBtn"),
+    batchGridSizeInput: document.getElementById("batchGridSizeInput"),
+    batchPreviewBtn: document.getElementById("batchPreviewBtn"),
     resetViewBtn: document.getElementById("resetViewBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
     showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
@@ -113,7 +126,11 @@
     sizeScanActive: false,
     sizeScanCompleted: 0,
     sizeScanTotal: 0,
-    selectedImages: new Set()
+    selectedImages: new Set(),
+    batchPreview: false,
+    batchGridSize: 3,
+    batchOffset: 0,
+    batchWheelDelta: 0
   };
 
   const preloadImages = new Map();
@@ -683,6 +700,7 @@
     els.heightMinFilter.value = "";
     els.heightMaxFilter.value = "";
     state.appliedFilters = { image: "", label: "", labelExact: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
+    if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
   }
 
@@ -696,6 +714,7 @@
       heightMin: els.heightMinFilter.value,
       heightMax: els.heightMaxFilter.value
     };
+    if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
     selectImage(firstFilteredImageName(state.filteredImageNames), { scrollList: true });
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
@@ -741,6 +760,8 @@
         return;
       }
       if (message.type === "error") {
+        state.batchPreview = false;
+        state.batchOffset = 0;
         state.data = null;
         state.imageNames = [];
         state.filteredImageNames = [];
@@ -771,6 +792,8 @@
 
   function applyLoadedPayload(payload) {
     cancelImageSizeScan();
+    state.batchPreview = false;
+    state.batchOffset = 0;
     state.data = payload.data;
     state.imageNames = payload.imageNames;
     state.filteredImageNames = payload.imageNames.slice();
@@ -816,6 +839,8 @@
       });
     } catch (error) {
       cancelImageSizeScan();
+      state.batchPreview = false;
+      state.batchOffset = 0;
       state.data = null;
       state.imageNames = [];
       state.filteredImageNames = [];
@@ -855,11 +880,143 @@
 
   function renderImageControls() {
     const visibleNames = getVisibleImageNames();
+    const batchItemsChanged = visibleNames.length !== state.filteredImageNames.length
+      || visibleNames.some(function hasChanged(name, index) {
+        return name !== state.filteredImageNames[index];
+      });
     state.filteredImageNames = visibleNames;
     els.imageCount.textContent = visibleNames.length + "/" + state.imageNames.length;
     updateKnownSizeText();
     imageListView.setItems(visibleNames, visibleNames.indexOf(state.currentImage));
     updateImageSelection();
+    els.batchPreviewBtn.disabled = !state.batchPreview && !visibleNames.length;
+    // Keep thumbnail nodes stable while background size scanning refreshes unchanged list chrome.
+    if (state.batchPreview && batchItemsChanged) renderBatchPreview();
+  }
+
+  function renderBatchPreviewMode() {
+    const active = state.batchPreview;
+    els.canvasShell.classList.toggle("is-batch-preview", active);
+    els.stage.hidden = active;
+    els.overlayCanvas.hidden = active;
+    els.batchPreviewGrid.hidden = !active;
+    els.emptyState.hidden = active;
+    els.batchProgressPanel.hidden = !active;
+    els.batchPreviewBtn.classList.toggle("active", active);
+    els.batchPreviewBtn.setAttribute("aria-pressed", String(active));
+    els.batchPreviewBtn.textContent = active ? "退出批量" : "批量预览";
+    els.batchPreviewBtn.disabled = !active && !state.filteredImageNames.length;
+  }
+
+  function renderBatchPreview() {
+    const names = state.filteredImageNames;
+    const gridSize = normalizeBatchGridSize(state.batchGridSize);
+    const previewWindow = getBatchPreviewWindow(names.length, gridSize, state.batchOffset);
+    const fragment = document.createDocumentFragment();
+
+    state.batchGridSize = gridSize;
+    state.batchOffset = previewWindow.start;
+    els.batchGridSizeInput.value = String(gridSize);
+    els.batchPreviewGrid.style.setProperty("--batch-grid-size", String(gridSize));
+    els.batchPreviewGrid.classList.toggle("is-dense", gridSize >= 6);
+
+    names.slice(previewWindow.start, previewWindow.end).forEach(function renderBatchImage(name, localIndex) {
+      const absoluteIndex = previewWindow.start + localIndex;
+      const button = document.createElement("button");
+      const image = document.createElement("img");
+      const caption = document.createElement("span");
+      const number = document.createElement("span");
+      const filename = document.createElement("span");
+
+      button.type = "button";
+      button.className = "batch-preview-item";
+      button.dataset.batchImageIndex = String(absoluteIndex);
+      button.title = (absoluteIndex + 1) + ". " + name;
+      image.src = imageUrl(name);
+      image.alt = name;
+      image.loading = "lazy";
+      image.draggable = false;
+      image.addEventListener("error", function onBatchImageError() {
+        button.classList.add("is-error");
+      });
+      caption.className = "batch-preview-caption";
+      number.className = "batch-preview-number";
+      number.textContent = String(absoluteIndex + 1);
+      filename.className = "batch-preview-filename";
+      filename.textContent = name;
+      caption.append(number, filename);
+      button.append(image, caption);
+      fragment.appendChild(button);
+    });
+
+    els.batchPreviewGrid.replaceChildren(fragment);
+    els.batchProgressRange.min = "0";
+    els.batchProgressRange.max = String(names.length);
+    els.batchProgressRange.value = String(previewWindow.end);
+    els.batchProgressRange.disabled = names.length <= previewWindow.capacity;
+    els.batchProgressRange.style.setProperty("--batch-progress", previewWindow.percent + "%");
+    els.batchProgressText.textContent = names.length
+      ? previewWindow.start + 1 + "-" + previewWindow.end + " / " + names.length
+      : "0 / 0";
+  }
+
+  function setBatchPreview(enabled) {
+    const nextEnabled = !!enabled;
+    if (nextEnabled && !state.filteredImageNames.length) {
+      setStatus("没有可批量预览的图片", 0);
+      return;
+    }
+
+    state.batchPreview = nextEnabled;
+    state.batchWheelDelta = 0;
+    if (nextEnabled) {
+      state.batchGridSize = normalizeBatchGridSize(els.batchGridSizeInput.value);
+      const currentIndex = state.filteredImageNames.indexOf(state.currentImage);
+      const requestedStart = currentIndex >= 0
+        ? Math.floor(currentIndex / state.batchGridSize) * state.batchGridSize
+        : 0;
+      state.batchOffset = getBatchPreviewWindow(
+        state.filteredImageNames.length,
+        state.batchGridSize,
+        requestedStart
+      ).start;
+      state.pendingKeypointPlacement = null;
+    }
+
+    renderBatchPreviewMode();
+    renderImageNavButtons();
+    if (nextEnabled) {
+      renderBatchPreview();
+      const previewWindow = getBatchPreviewWindow(
+        state.filteredImageNames.length,
+        state.batchGridSize,
+        state.batchOffset
+      );
+      setStatus(
+        "批量预览 " + (previewWindow.start + 1) + "-" + previewWindow.end + " / " + state.filteredImageNames.length,
+        previewWindow.percent
+      );
+      return;
+    }
+
+    window.requestAnimationFrame(function restoreSingleImageView() {
+      syncCanvasSize();
+      resetView();
+      renderAll();
+    });
+  }
+
+  function moveBatchPreview(direction) {
+    if (!state.batchPreview) return;
+    const nextOffset = advanceBatchPreviewOffset(
+      state.filteredImageNames.length,
+      state.batchGridSize,
+      state.batchOffset,
+      direction
+    );
+    if (nextOffset === state.batchOffset) return;
+    state.batchOffset = nextOffset;
+    renderBatchPreview();
   }
 
   function renderObjects() {
@@ -979,6 +1136,11 @@
   }
 
   function renderImageNavButtons() {
+    if (state.batchPreview) {
+      els.prevImageBtn.hidden = true;
+      els.nextImageBtn.hidden = true;
+      return;
+    }
     const names = state.filteredImageNames.length ? state.filteredImageNames : state.imageNames;
     const index = names.indexOf(state.currentImage);
     const hasImage = index >= 0;
@@ -1304,6 +1466,7 @@
   }
 
   function renderFull() {
+    renderBatchPreviewMode();
     renderImageControls();
     renderAll();
   }
@@ -1615,6 +1778,15 @@
   }
 
   function wheelZoom(event) {
+    if (state.batchPreview) {
+      event.preventDefault();
+      const deltaScale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? els.canvasShell.clientHeight : 1;
+      state.batchWheelDelta += event.deltaY * deltaScale;
+      if (Math.abs(state.batchWheelDelta) < 32) return;
+      moveBatchPreview(state.batchWheelDelta < 0 ? -1 : 1);
+      state.batchWheelDelta = 0;
+      return;
+    }
     if (!state.currentImage || !els.mainImage.naturalWidth) return;
     event.preventDefault();
     const factor = Math.exp(-event.deltaY * 0.0015);
@@ -1630,6 +1802,7 @@
   }
 
   function startPan(event) {
+    if (state.batchPreview) return;
     if (event.button !== 0 || state.drag || !state.currentImage) return;
     if (isKeypointPlacementPending()) {
       if (event.target.closest && event.target.closest("button, input, textarea, select")) return;
@@ -1909,6 +2082,7 @@
     const index = Number(button.dataset.imageIndex);
     const name = state.filteredImageNames[index];
     if (typeof name === "string") {
+      if (state.batchPreview) setBatchPreview(false);
       selectImage(name);
     }
   }
@@ -1926,6 +2100,33 @@
   els.copyJsonBtn.addEventListener("click", copyJson);
   els.downloadJsonBtn.addEventListener("click", downloadJson);
   els.exportSelectedBtn.addEventListener("click", exportSelected);
+  els.batchPreviewBtn.addEventListener("click", function onBatchPreviewToggle() {
+    setBatchPreview(!state.batchPreview);
+  });
+  els.batchGridSizeInput.addEventListener("change", function onBatchGridSizeChange() {
+    state.batchGridSize = normalizeBatchGridSize(els.batchGridSizeInput.value);
+    state.batchOffset = 0;
+    els.batchGridSizeInput.value = String(state.batchGridSize);
+    if (state.batchPreview) renderBatchPreview();
+  });
+  els.batchProgressRange.addEventListener("input", function onBatchProgressInput() {
+    if (!state.batchPreview) return;
+    const previewWindow = getBatchPreviewWindow(
+      state.filteredImageNames.length,
+      state.batchGridSize,
+      state.batchOffset
+    );
+    state.batchOffset = Number(els.batchProgressRange.value) - previewWindow.capacity;
+    renderBatchPreview();
+  });
+  els.batchPreviewGrid.addEventListener("click", function onBatchPreviewClick(event) {
+    const button = event.target.closest ? event.target.closest("button[data-batch-image-index]") : null;
+    if (!button) return;
+    const name = state.filteredImageNames[Number(button.dataset.batchImageIndex)];
+    if (typeof name !== "string") return;
+    setBatchPreview(false);
+    selectImage(name, { scrollList: true });
+  });
   els.jsonFileInput.addEventListener("change", function onchange(event) {
     readJsonFile(event.target.files[0]);
   });
@@ -2062,6 +2263,7 @@
   els.canvasShell.addEventListener("pointerup", endPan);
   els.canvasShell.addEventListener("pointercancel", endPan);
   els.canvasShell.addEventListener("click", function onclick(event) {
+    if (state.batchPreview) return;
     if (state.suppressNextClick) {
       event.preventDefault();
       event.stopPropagation();
@@ -2077,6 +2279,11 @@
   }, true);
   document.addEventListener("keydown", function onkeydown(event) {
     if (shouldIgnoreImageShortcut(event)) return;
+    if (state.batchPreview && ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(event.key)) {
+      event.preventDefault();
+      moveBatchPreview(event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1);
+      return;
+    }
     if (event.key === "ArrowLeft") {
       event.preventDefault();
       selectAdjacentImage(-1);

@@ -54,6 +54,13 @@
           <div class="panel-title">
             <strong>图片</strong>
           </div>
+          <div id="batchProgressPanel" class="batch-progress-panel" hidden>
+            <div class="batch-progress-title">
+              <span>批量预览位置</span>
+              <output id="batchProgressText">0 / 0</output>
+            </div>
+            <input id="batchProgressRange" type="range" min="0" max="0" step="1" value="0" aria-label="批量预览位置" />
+          </div>
           <div class="filter-layout">
             <div class="filter-stack">
               <div class="filter-text-row">
@@ -104,6 +111,11 @@
             </div>
           </label>
           <div class="toolbar-actions">
+            <label class="batch-size-control" title="输入每行和每列显示的图片数量，范围 2 到 10">
+              <span>批量 N</span>
+              <input id="batchGridSizeInput" type="number" min="2" max="10" step="1" value="3" inputmode="numeric" aria-label="批量预览每行每列图片数" />
+            </label>
+            <button id="batchPreviewBtn" type="button" aria-pressed="false">批量预览</button>
             <button id="resetViewBtn" type="button">复位</button>
             <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
             <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
@@ -145,6 +157,7 @@
           <div id="stage" class="stage">
             <img id="mainImage" alt="" />
           </div>
+          <div id="batchPreviewGrid" class="batch-preview-grid" aria-label="批量图片预览" hidden></div>
           <canvas id="overlayCanvas" aria-label="objects overlay"></canvas>
           <div id="emptyState" class="empty-state">
             <strong>未加载数据</strong>

@@ -141,6 +141,22 @@ textarea {
   font-size: 12px;
 }
 
+.batch-size-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.batch-size-control input {
+  width: 54px;
+  height: 28px;
+  padding: 0 4px 0 7px;
+  font-size: 12px;
+}
+
 .actions button:last-child,
 #loadBtn,
 #applyObjectBtn {
@@ -247,6 +263,37 @@ textarea {
   height: 100%;
   background: var(--accent-2);
   transition: width 180ms ease;
+}
+
+.batch-progress-panel {
+  margin: 0 0 8px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+
+.batch-progress-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.batch-progress-title output {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+#batchProgressRange {
+  width: 100%;
+  height: 16px;
+  padding: 0;
+  accent-color: var(--accent-2);
+  cursor: pointer;
 }
 
 .status {
@@ -560,6 +607,10 @@ textarea {
   cursor: crosshair;
 }
 
+.canvas-shell.is-batch-preview {
+  cursor: default;
+}
+
 .stage {
   position: relative;
   width: max-content;
@@ -584,6 +635,113 @@ textarea {
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.batch-preview-grid {
+  --batch-grid-size: 3;
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(var(--batch-grid-size), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--batch-grid-size), minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px;
+  background: #101418;
+}
+
+.batch-preview-grid.is-dense {
+  gap: 2px;
+  padding: 3px;
+}
+
+.batch-preview-item {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  border-color: #34404d;
+  border-radius: 4px;
+  background: #080b0e;
+}
+
+.batch-preview-item:hover,
+.batch-preview-item:focus-visible {
+  z-index: 1;
+  border-color: #38bdf8;
+  outline: 1px solid #38bdf8;
+}
+
+.batch-preview-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.batch-preview-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  background: rgba(8, 11, 14, 0.78);
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.batch-preview-number {
+  flex: 0 0 auto;
+  color: #7dd3fc;
+  font-variant-numeric: tabular-nums;
+}
+
+.batch-preview-filename {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.batch-preview-grid.is-dense .batch-preview-caption {
+  right: auto;
+  padding: 2px 3px;
+}
+
+.batch-preview-grid.is-dense .batch-preview-filename {
+  display: none;
+}
+
+.batch-preview-item.is-error img {
+  opacity: 0.2;
+}
+
+.batch-preview-item.is-error::after {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  color: #fca5a5;
+  font-size: 11px;
+  content: "加载失败";
+}
+
+.batch-preview-grid[hidden],
+.batch-progress-panel[hidden],
+.stage[hidden],
+#overlayCanvas[hidden],
+.empty-state[hidden] {
+  display: none;
 }
 
 .image-nav {
