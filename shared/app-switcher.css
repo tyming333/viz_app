@@ -1,0 +1,21 @@
+.app-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-switcher select {
+  min-height: 25px;
+  padding: 2px 26px 2px 8px;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 5px;
+  background: var(--surface, #ffffff);
+  color: var(--text, #172033);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.app-switcher select:focus-visible {
+  outline: 2px solid var(--accent, #2563eb);
+  outline-offset: 1px;
+}

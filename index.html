@@ -5,12 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>数据可视化工具</title>
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./shared/app-switcher.css" />
+    <script src="./shared/app-switcher.js" defer></script>
+    <script src="./viewer-core.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
-  <body>
+  <body data-app="viewer">
     <header class="topbar">
       <div class="brand">
-        <h1>数据可视化工具 <span class="version-label">wanhaoming version 1.0</span></h1>
+        <h1>
+          <label class="app-switcher">
+            <span class="sr-only">应用</span>
+            <select id="appSwitcher" aria-label="选择应用">
+              <option value="viewer">数据可视化工具</option>
+              <option value="field-defect">现场缺陷展示</option>
+            </select>
+          </label>
+          <span class="version-label">wanhaoming version 1.0</span>
+        </h1>
       </div>
       <div class="actions">
         <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
@@ -48,6 +60,9 @@
               <input id="imageFilter" type="search" placeholder="筛选图片名" />
               <input id="labelFilter" type="search" placeholder="筛选 labels" />
               </div>
+              <select id="labelSelect" aria-label="从当前 JSON 的全部 labels 中选择" disabled>
+                <option value="">全部 labels</option>
+              </select>
             <div class="filter-range-grid">
               <label class="range-field">
                 <span>宽度</span>

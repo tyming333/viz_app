@@ -1,6 +1,8 @@
 ﻿(function () {
   "use strict";
 
+  const { collectDataLabels, matchesLabelFilter, firstFilteredImageName } = window.ViewerCore;
+
   const els = {
     prefixInput: document.getElementById("prefixInput"),
     jsonFileInput: document.getElementById("jsonFileInput"),
@@ -13,6 +15,7 @@
     imageCount: document.getElementById("imageCount"),
     imageFilter: document.getElementById("imageFilter"),
     labelFilter: document.getElementById("labelFilter"),
+    labelSelect: document.getElementById("labelSelect"),
     widthMinFilter: document.getElementById("widthMinFilter"),
     widthMaxFilter: document.getElementById("widthMaxFilter"),
     heightMinFilter: document.getElementById("heightMinFilter"),
@@ -76,6 +79,7 @@
     appliedFilters: {
       image: "",
       label: "",
+      labelExact: "",
       widthMin: "",
       widthMax: "",
       heightMin: "",
@@ -182,7 +186,8 @@
     return {
       imageNames,
       objectTotal,
-      meta
+      meta,
+      labels: collectDataLabels(data)
     };
   }
 
@@ -193,6 +198,7 @@
       labelText: Array.from(labels, function lower(label) {
         return label.toLowerCase();
       }).join("\n"),
+      labels: Array.from(labels),
       objectCount: objects.length
     };
   }
@@ -373,13 +379,9 @@
 
   function visibleOverlayObjects() {
     const objects = currentObjects();
-    const labelFilter = state.appliedFilters.label.trim().toLowerCase();
-    if (!labelFilter) return objects;
     return objects.filter(function filterObject(obj) {
       const labels = Array.isArray(obj.labels) ? obj.labels : [];
-      return labels.some(function matchLabel(label) {
-        return String(label || "").toLowerCase().includes(labelFilter);
-      });
+      return matchesLabelFilter(labels, state.appliedFilters.labelExact, state.appliedFilters.label);
     });
   }
 
@@ -424,6 +426,34 @@
   function refreshImageMeta(name) {
     if (!name) return;
     state.imageMeta.set(name, buildImageMeta(name));
+  }
+
+  function renderLabelOptions(labels) {
+    const items = Array.isArray(labels) ? labels : [];
+    const current = els.labelSelect.value || state.appliedFilters.labelExact;
+    const fragment = document.createDocumentFragment();
+    const allOption = document.createElement("option");
+    allOption.value = "";
+    allOption.textContent = "全部 labels";
+    fragment.appendChild(allOption);
+    items.forEach(function addLabelOption(label) {
+      const option = document.createElement("option");
+      option.value = label;
+      option.textContent = label;
+      fragment.appendChild(option);
+    });
+    els.labelSelect.replaceChildren(fragment);
+    els.labelSelect.disabled = items.length === 0;
+    if (items.includes(current)) {
+      els.labelSelect.value = current;
+      return;
+    }
+    els.labelSelect.value = "";
+    if (state.appliedFilters.labelExact === current) state.appliedFilters.labelExact = "";
+  }
+
+  function refreshLabelOptions() {
+    renderLabelOptions(collectDataLabels(state.data));
   }
 
   function setKnownImageSize(name, width, height) {
@@ -524,7 +554,6 @@
   function getVisibleImageNames() {
     const filters = state.appliedFilters;
     const nameFilter = filters.image.trim().toLowerCase();
-    const labelFilter = filters.label.trim().toLowerCase();
     const widthMin = filters.widthMin === "" ? null : Number(filters.widthMin);
     const widthMax = filters.widthMax === "" ? null : Number(filters.widthMax);
     const heightMin = filters.heightMin === "" ? null : Number(filters.heightMin);
@@ -533,7 +562,7 @@
     return state.imageNames.filter(function filterImage(name) {
       const meta = state.imageMeta.get(name);
       if (nameFilter && (!meta || !meta.nameLower.includes(nameFilter))) return false;
-      if (labelFilter && (!meta || !meta.labelText.includes(labelFilter))) return false;
+      if (!meta || !matchesLabelFilter(meta.labels, filters.labelExact, filters.label)) return false;
       if (widthMin !== null || widthMax !== null || heightMin !== null || heightMax !== null) {
         const size = state.knownImageSizes.get(name);
         if (!size) return false;
@@ -648,11 +677,12 @@
   function clearFilters() {
     els.imageFilter.value = "";
     els.labelFilter.value = "";
+    els.labelSelect.value = "";
     els.widthMinFilter.value = "";
     els.widthMaxFilter.value = "";
     els.heightMinFilter.value = "";
     els.heightMaxFilter.value = "";
-    state.appliedFilters = { image: "", label: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
+    state.appliedFilters = { image: "", label: "", labelExact: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
     renderImageControls();
   }
 
@@ -660,12 +690,14 @@
     state.appliedFilters = {
       image: els.imageFilter.value,
       label: els.labelFilter.value,
+      labelExact: els.labelSelect.value,
       widthMin: els.widthMinFilter.value,
       widthMax: els.widthMaxFilter.value,
       heightMin: els.heightMinFilter.value,
       heightMax: els.heightMaxFilter.value
     };
     renderImageControls();
+    selectImage(firstFilteredImageName(state.filteredImageNames), { scrollList: true });
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
 
@@ -713,6 +745,7 @@
         state.imageNames = [];
         state.filteredImageNames = [];
         state.imageMeta.clear();
+        renderLabelOptions([]);
         state.knownImageSizes.clear();
         preloadImages.clear();
         state.currentImage = "";
@@ -742,6 +775,7 @@
     state.imageNames = payload.imageNames;
     state.filteredImageNames = payload.imageNames.slice();
     state.imageMeta = new Map(Object.entries(payload.meta));
+    renderLabelOptions(payload.labels);
     state.knownImageSizes.clear();
     preloadImages.clear();
     state.currentImage = "";
@@ -777,7 +811,8 @@
         data: parsed,
         imageNames: result.imageNames,
         objectTotal: result.objectTotal,
-        meta: result.meta
+        meta: result.meta,
+        labels: result.labels
       });
     } catch (error) {
       cancelImageSizeScan();
@@ -785,6 +820,7 @@
       state.imageNames = [];
       state.filteredImageNames = [];
       state.imageMeta.clear();
+      renderLabelOptions([]);
       state.knownImageSizes.clear();
       preloadImages.clear();
       state.currentImage = "";
@@ -1409,6 +1445,7 @@
     }
     obj.bbox = next;
     refreshImageMeta(state.currentImage);
+    refreshLabelOptions();
     renderImageControls();
     setStatus("已应用修改", 100);
     renderAll();
@@ -1521,6 +1558,7 @@
     });
     state.selectedObjectIndex = objects.length - 1;
     refreshImageMeta(state.currentImage);
+    refreshLabelOptions();
     renderImageControls();
     setStatus(boxType === "rectangle" ? "已新增矩形框" : "已新增四点框", 100);
     renderAll();
@@ -1532,6 +1570,7 @@
     objects.splice(state.selectedObjectIndex, 1);
     state.selectedObjectIndex = Math.min(state.selectedObjectIndex, objects.length - 1);
     refreshImageMeta(state.currentImage);
+    refreshLabelOptions();
     renderImageControls();
     setStatus("已删除选中 object", 100);
     renderAll();
@@ -1892,6 +1931,12 @@
   });
   els.applyFiltersBtn.addEventListener("click", applyFilters);
   els.clearFiltersBtn.addEventListener("click", clearFilters);
+  els.labelSelect.addEventListener("change", function onLabelSelectChange() {
+    if (els.labelSelect.value) els.labelFilter.value = "";
+  });
+  els.labelFilter.addEventListener("input", function onLabelFilterInput() {
+    if (els.labelFilter.value.trim()) els.labelSelect.value = "";
+  });
   [els.imageFilter, els.labelFilter, els.widthMinFilter, els.widthMaxFilter, els.heightMinFilter, els.heightMaxFilter]
     .forEach(function bindFilterEnter(input) {
       input.addEventListener("keydown", function onfilterkeydown(event) {

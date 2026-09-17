@@ -1,5 +1,9 @@
 "use strict";
 
+importScripts("./viewer-core.js");
+
+const { collectDataLabels } = self.ViewerCore;
+
 function isMissingKeypoint(point) {
   return point === null || (Array.isArray(point) && point.length === 1 && point[0] === "null");
 }
@@ -75,6 +79,7 @@ function validateData(data) {
     meta[name] = {
       nameLower: name.toLowerCase(),
       labelText: Array.from(labels, (item) => item.toLowerCase()).join("\n"),
+      labels: Array.from(labels),
       objectCount: objects.length
     };
 
@@ -90,7 +95,8 @@ function validateData(data) {
   return {
     imageNames,
     objectTotal,
-    meta
+    meta,
+    labels: collectDataLabels(data)
   };
 }
 
@@ -109,7 +115,8 @@ self.onmessage = function onmessage(event) {
         data: parsed,
         imageNames: result.imageNames,
         objectTotal: result.objectTotal,
-        meta: result.meta
+        meta: result.meta,
+        labels: result.labels
       }
     });
   } catch (error) {
