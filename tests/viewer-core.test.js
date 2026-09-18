@@ -6,7 +6,15 @@ const {
   firstFilteredImageName,
   normalizeBatchGridSize,
   getBatchPreviewWindow,
-  advanceBatchPreviewOffset
+  advanceBatchPreviewOffset,
+  isAxisAlignedRectangle,
+  setRectangleHandlePosition,
+  setRectangleEdgePosition,
+  clampBboxToImage,
+  translateBboxWithinImage,
+  createUndoHistory,
+  resolveHoverTarget,
+  getImageNavigationStep
 } = require("../viewer-core.js");
 
 test("collects unique non-empty labels from the entire imported JSON", () => {
@@ -79,4 +87,64 @@ test("moves the batch preview by one grid row and clamps at both ends", () => {
   assert.equal(advanceBatchPreviewOffset?.(40, 4, 4, -1), 0);
   assert.equal(advanceBatchPreviewOffset?.(18, 4, 0, 1), 2);
   assert.equal(advanceBatchPreviewOffset?.(18, 4, 2, 1), 2);
+});
+
+test("keeps rectangle corner editing axis-aligned", () => {
+  const bbox = [10, 20, 110, 20, 110, 80, 10, 80];
+  assert.equal(isAxisAlignedRectangle?.(bbox), true);
+  assert.deepEqual(setRectangleHandlePosition?.(bbox, 0, 35, 5), [35, 5, 110, 5, 110, 80, 35, 80]);
+  assert.deepEqual(setRectangleHandlePosition?.(bbox, 2, 140, 95), [10, 20, 140, 20, 140, 95, 10, 95]);
+});
+
+test("keeps rectangle edge editing axis-aligned", () => {
+  const bbox = [10, 20, 110, 20, 110, 80, 10, 80];
+  assert.deepEqual(setRectangleEdgePosition?.(bbox, 0, 0, 5), [10, 5, 110, 5, 110, 80, 10, 80]);
+  assert.deepEqual(setRectangleEdgePosition?.(bbox, 1, 140, 0), [10, 20, 140, 20, 140, 80, 10, 80]);
+  assert.deepEqual(setRectangleEdgePosition?.(bbox, 2, 0, 95), [10, 20, 110, 20, 110, 95, 10, 95]);
+  assert.deepEqual(setRectangleEdgePosition?.(bbox, 3, 35, 0), [35, 20, 110, 20, 110, 80, 35, 80]);
+});
+
+test("clamps bbox coordinates to the image boundary", () => {
+  assert.deepEqual(clampBboxToImage?.([-10, 5, 120, 5, 120, 90, -10, 90], 100, 80), [0, 5, 100, 5, 100, 80, 0, 80]);
+  assert.deepEqual(clampBboxToImage?.([10, 20, 40, 15, 35, 70, 5, 75], 100, 80), [10, 20, 40, 15, 35, 70, 5, 75]);
+});
+
+test("limits whole-bbox movement so its outer bounds stay in the image", () => {
+  const bbox = [10, 20, 40, 20, 40, 60, 10, 60];
+  assert.deepEqual(translateBboxWithinImage?.(bbox, 100, 100, 100, 80), [70, 40, 100, 40, 100, 80, 70, 80]);
+  assert.deepEqual(translateBboxWithinImage?.(bbox, -100, -100, 100, 80), [0, 0, 30, 0, 30, 40, 0, 40]);
+});
+
+test("keeps undo snapshots in last-in-first-out order within the configured limit", () => {
+  const history = createUndoHistory?.(2);
+  history.push({ value: 1 });
+  history.push({ value: 2 });
+  history.push({ value: 3 });
+
+  assert.equal(history.size(), 2);
+  assert.deepEqual(history.pop(), { value: 3 });
+  assert.deepEqual(history.pop(), { value: 2 });
+  assert.equal(history.pop(), null);
+
+  history.push({ value: 4 });
+  history.clear();
+  assert.equal(history.size(), 0);
+});
+
+test("prioritizes hover feedback targets and limits body feedback to the selected object", () => {
+  assert.deepEqual(resolveHoverTarget?.(2, 1, 0, 3, 3), { kind: "point", index: 2 });
+  assert.deepEqual(resolveHoverTarget?.(-1, 1, 0, 3, 3), { kind: "point", index: 1 });
+  assert.deepEqual(resolveHoverTarget?.(-1, -1, 0, 3, 3), { kind: "edge", index: 0 });
+  assert.deepEqual(resolveHoverTarget?.(-1, -1, -1, 3, 3), { kind: "object", index: 3 });
+  assert.deepEqual(resolveHoverTarget?.(-1, -1, -1, 2, 3), { kind: "none", index: -1 });
+});
+
+test("maps WASD and arrow keys to adjacent image navigation", () => {
+  ["w", "a", "W", "A", "ArrowLeft", "ArrowUp"].forEach((key) => {
+    assert.equal(getImageNavigationStep?.(key), -1);
+  });
+  ["s", "d", "S", "D", "ArrowRight", "ArrowDown"].forEach((key) => {
+    assert.equal(getImageNavigationStep?.(key), 1);
+  });
+  assert.equal(getImageNavigationStep?.("Delete"), 0);
 });

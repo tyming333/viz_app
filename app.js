@@ -5,6 +5,14 @@
     collectDataLabels,
     matchesLabelFilter,
     firstFilteredImageName,
+    isAxisAlignedRectangle,
+    setRectangleHandlePosition,
+    setRectangleEdgePosition,
+    clampBboxToImage,
+    translateBboxWithinImage,
+    resolveHoverTarget,
+    getImageNavigationStep,
+    createUndoHistory,
     normalizeBatchGridSize,
     getBatchPreviewWindow,
     advanceBatchPreviewOffset
@@ -127,6 +135,10 @@
     sizeScanCompleted: 0,
     sizeScanTotal: 0,
     selectedImages: new Set(),
+    undoHistory: createUndoHistory(50),
+    hoverTarget: { kind: "none", index: -1 },
+    hoverPulse: 0,
+    hoverAnimationFrame: 0,
     batchPreview: false,
     batchGridSize: 3,
     batchOffset: 0,
@@ -135,6 +147,73 @@
 
   const preloadImages = new Map();
   let imageWorker = null;
+
+  function cloneData(data) {
+    return data === null || data === undefined ? data : JSON.parse(JSON.stringify(data));
+  }
+
+  function recordUndoSnapshot() {
+    if (!state.data) return;
+    state.undoHistory.push(cloneData(state.data));
+  }
+
+  function clearUndoHistory() {
+    state.undoHistory.clear();
+  }
+
+  function sameHoverTarget(left, right) {
+    return left.kind === right.kind && left.index === right.index;
+  }
+
+  function stopHoverAnimation() {
+    if (state.hoverAnimationFrame) {
+      window.cancelAnimationFrame(state.hoverAnimationFrame);
+      state.hoverAnimationFrame = 0;
+    }
+    state.hoverPulse = 0;
+  }
+
+  function animateHoverEffect(timestamp) {
+    state.hoverAnimationFrame = 0;
+    if (state.hoverTarget.kind === "none" || state.drag || state.pan || state.batchPreview) {
+      state.hoverPulse = 0;
+      renderOverlay();
+      return;
+    }
+    state.hoverPulse = 0.5 + 0.5 * Math.sin(timestamp / 180);
+    renderOverlayNow();
+    state.hoverAnimationFrame = window.requestAnimationFrame(animateHoverEffect);
+  }
+
+  function setHoverTarget(target) {
+    if (sameHoverTarget(state.hoverTarget, target)) return;
+    state.hoverTarget = target;
+    stopHoverAnimation();
+    if (target.kind !== "none" && !state.drag && !state.pan && !state.batchPreview) {
+      state.hoverAnimationFrame = window.requestAnimationFrame(animateHoverEffect);
+    }
+    renderOverlay();
+  }
+
+  function undoLastChange() {
+    const previous = state.undoHistory.pop();
+    if (!previous) {
+      setStatus("没有可撤销的操作", 0);
+      return false;
+    }
+    state.data = previous;
+    state.pendingKeypointPlacement = null;
+    const objects = currentObjects();
+    state.selectedObjectIndex = objects.length
+      ? Math.max(0, Math.min(state.selectedObjectIndex, objects.length - 1))
+      : -1;
+    refreshImageMeta(state.currentImage);
+    refreshLabelOptions();
+    renderImageControls();
+    renderAll();
+    setStatus("已撤销上一步操作", 100);
+    return true;
+  }
 
   function isMissingKeypoint(point) {
     return point === null || (Array.isArray(point) && point.length === 1 && point[0] === "null");
@@ -502,19 +581,11 @@
     ];
   }
 
-  // Older annotations have no type marker and retain the original free four-point behavior.
   function getObjectBoxType(obj) {
-    return obj && obj.attrs && obj.attrs.box_type === "rectangle" ? "rectangle" : "quadrilateral";
-  }
-
-  function setRectangleHandlePosition(bbox, handleIndex, x, y) {
-    const points = bboxToPoints(bbox);
-    const opposite = points[(handleIndex + 2) % 4];
-    const left = Math.min(x, opposite[0]);
-    const right = Math.max(x, opposite[0]);
-    const top = Math.min(y, opposite[1]);
-    const bottom = Math.max(y, opposite[1]);
-    return [left, top, right, top, right, bottom, left, bottom];
+    return (obj && obj.attrs && obj.attrs.box_type === "rectangle")
+      || !!(obj && isAxisAlignedRectangle(obj.bbox))
+      ? "rectangle"
+      : "quadrilateral";
   }
 
   function translateBbox(bbox, dx, dy) {
@@ -760,6 +831,7 @@
         return;
       }
       if (message.type === "error") {
+        clearUndoHistory();
         state.batchPreview = false;
         state.batchOffset = 0;
         state.data = null;
@@ -792,6 +864,7 @@
 
   function applyLoadedPayload(payload) {
     cancelImageSizeScan();
+    clearUndoHistory();
     state.batchPreview = false;
     state.batchOffset = 0;
     state.data = payload.data;
@@ -839,6 +912,7 @@
       });
     } catch (error) {
       cancelImageSizeScan();
+      clearUndoHistory();
       state.batchPreview = false;
       state.batchOffset = 0;
       state.data = null;
@@ -969,6 +1043,7 @@
 
     state.batchPreview = nextEnabled;
     state.batchWheelDelta = 0;
+    setHoverTarget({ kind: "none", index: -1 });
     if (nextEnabled) {
       state.batchGridSize = normalizeBatchGridSize(els.batchGridSizeInput.value);
       const currentIndex = state.filteredImageNames.indexOf(state.currentImage);
@@ -1279,6 +1354,33 @@
     return -1;
   }
 
+  function distanceToSegment(pointX, pointY, startX, startY, endX, endY) {
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const lengthSquared = dx * dx + dy * dy;
+    const ratio = lengthSquared
+      ? Math.max(0, Math.min(1, ((pointX - startX) * dx + (pointY - startY) * dy) / lengthSquared))
+      : 0;
+    const closestX = startX + ratio * dx;
+    const closestY = startY + ratio * dy;
+    return Math.hypot(pointX - closestX, pointY - closestY);
+  }
+
+  function findRectangleEdgeHit(imageX, imageY) {
+    const obj = currentObject();
+    if (!obj || getObjectBoxType(obj) !== "rectangle") return -1;
+    const threshold = 9 / getOverlayScale();
+    const points = bboxToPoints(obj.bbox);
+    for (let index = 0; index < points.length; index += 1) {
+      const start = points[index];
+      const end = points[(index + 1) % points.length];
+      if (distanceToSegment(imageX, imageY, start[0], start[1], end[0], end[1]) <= threshold) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
   function findKeypointHit(imageX, imageY) {
     const obj = currentObject();
     if (!obj) return -1;
@@ -1293,20 +1395,46 @@
     return -1;
   }
 
-  function drawPolygon(points, color, fillStyle, active) {
+  function updateObjectPointerCursor(event) {
+    if (state.batchPreview || !state.currentImage || state.drag || state.pan || isKeypointPlacementPending()) {
+      els.canvasShell.classList.remove("is-object-target");
+      setHoverTarget({ kind: "none", index: -1 });
+      return;
+    }
+    const coords = getImageCoordsFromClient(event.clientX, event.clientY);
+    const keypointIndex = state.showKeypoints ? findKeypointHit(coords.x, coords.y) : -1;
+    const handleIndex = state.showBoxes ? findHandleHit(coords.x, coords.y) : -1;
+    const edgeIndex = state.showBoxes ? findRectangleEdgeHit(coords.x, coords.y) : -1;
+    const objectIndex = pickObjectAtPoint(coords.x, coords.y);
+    const target = resolveHoverTarget(keypointIndex, handleIndex, edgeIndex, objectIndex, state.selectedObjectIndex);
+    const isTarget = keypointIndex >= 0 || handleIndex >= 0 || edgeIndex >= 0 || objectIndex >= 0;
+    setHoverTarget(target);
+    els.canvasShell.classList.toggle("is-object-target", isTarget);
+  }
+
+  function drawPolygon(points, color, fillStyle, active, hovered) {
+    const pulse = hovered ? state.hoverPulse : 0;
+    overlayContext.save();
     overlayContext.beginPath();
     overlayContext.moveTo(points[0][0], points[0][1]);
     for (let i = 1; i < points.length; i += 1) {
       overlayContext.lineTo(points[i][0], points[i][1]);
     }
     overlayContext.closePath();
-    overlayContext.lineWidth = state.boxStrokeWidth / getOverlayScale();
-    overlayContext.strokeStyle = active ? "#facc15" : color;
+    overlayContext.lineWidth = (state.boxStrokeWidth + (hovered ? 1.5 + pulse : 0)) / getOverlayScale();
+    overlayContext.strokeStyle = hovered ? "#fde68a" : active ? "#facc15" : color;
+    if (hovered) {
+      overlayContext.shadowColor = "rgba(250,204,21," + (0.38 + pulse * 0.24).toFixed(2) + ")";
+      overlayContext.shadowBlur = (5 + pulse * 5) / getOverlayScale();
+    }
     if (state.showBoxFill) {
-      overlayContext.fillStyle = active ? "rgba(15,118,110,0.25)" : fillStyle;
+      overlayContext.fillStyle = hovered
+        ? "rgba(250,204,21," + (0.10 + pulse * 0.08).toFixed(2) + ")"
+        : active ? "rgba(15,118,110,0.25)" : fillStyle;
       overlayContext.fill();
     }
     overlayContext.stroke();
+    overlayContext.restore();
   }
 
   function drawLabel(points, label) {
@@ -1336,10 +1464,17 @@
     overlayContext.fillStyle = color;
     keypoints.forEach(function eachKeypoint(keypoint) {
       const point = keypoint.point;
+      const hovered = active && state.hoverTarget.kind === "point" && state.hoverTarget.index === keypoint.index;
+      const hoverPulse = hovered ? state.hoverPulse : 0;
       overlayContext.beginPath();
-      overlayContext.arc(point[0], point[1], radius, 0, Math.PI * 2);
+      overlayContext.arc(point[0], point[1], radius + (hovered ? 2 + hoverPulse * 1.5 : 0), 0, Math.PI * 2);
+      if (hovered) {
+        overlayContext.shadowColor = "rgba(250,204,21," + (0.42 + hoverPulse * 0.2).toFixed(2) + ")";
+        overlayContext.shadowBlur = (6 + hoverPulse * 5) / getOverlayScale();
+      }
       overlayContext.fill();
       overlayContext.stroke();
+      overlayContext.shadowBlur = 0;
     });
     overlayContext.restore();
   }
@@ -1369,16 +1504,41 @@
     const obj = currentObject();
     if (!obj) return;
     const radius = 6 / getOverlayScale();
+    const points = bboxToPoints(obj.bbox);
     overlayContext.save();
     overlayContext.lineWidth = 2 / getOverlayScale();
     overlayContext.strokeStyle = "#ef4444";
     overlayContext.fillStyle = "#ffffff";
-    bboxToPoints(obj.bbox).forEach(function eachPoint(point) {
+    points.forEach(function eachPoint(point, pointIndex) {
+      const hovered = state.hoverTarget.kind === "point" && state.hoverTarget.index === pointIndex;
+      const pulse = hovered ? state.hoverPulse : 0;
       overlayContext.beginPath();
-      overlayContext.arc(point[0], point[1], radius, 0, Math.PI * 2);
+      overlayContext.arc(point[0], point[1], radius + (hovered ? 2 + pulse * 1.5 : 0), 0, Math.PI * 2);
+      if (hovered) {
+        overlayContext.shadowColor = "rgba(250,204,21," + (0.42 + pulse * 0.2).toFixed(2) + ")";
+        overlayContext.shadowBlur = (6 + pulse * 5) / getOverlayScale();
+      }
       overlayContext.fill();
       overlayContext.stroke();
+      overlayContext.shadowBlur = 0;
     });
+    overlayContext.restore();
+  }
+
+  function drawHoverEdge(points, edgeIndex) {
+    if (edgeIndex < 0 || edgeIndex >= points.length) return;
+    const start = points[edgeIndex];
+    const end = points[(edgeIndex + 1) % points.length];
+    const pulse = state.hoverPulse;
+    overlayContext.save();
+    overlayContext.beginPath();
+    overlayContext.moveTo(start[0], start[1]);
+    overlayContext.lineTo(end[0], end[1]);
+    overlayContext.lineWidth = (state.boxStrokeWidth + 2 + pulse * 1.5) / getOverlayScale();
+    overlayContext.strokeStyle = "rgba(253,230,138," + (0.72 + pulse * 0.2).toFixed(2) + ")";
+    overlayContext.shadowColor = "rgba(250,204,21," + (0.44 + pulse * 0.2).toFixed(2) + ")";
+    overlayContext.shadowBlur = (6 + pulse * 5) / getOverlayScale();
+    overlayContext.stroke();
     overlayContext.restore();
   }
 
@@ -1390,13 +1550,17 @@
     overlayContext.setTransform(dpr, 0, 0, dpr, 0, 0);
     overlayContext.translate(state.panX, state.panY);
     overlayContext.scale(state.zoom, state.zoom);
-    const objects = visibleOverlayObjects();
+    const objects = currentObjects();
     objects.forEach(function eachObject(obj, index) {
+      const labels = Array.isArray(obj.labels) ? obj.labels : [];
+      if (!matchesLabelFilter(labels, state.appliedFilters.labelExact, state.appliedFilters.label)) return;
       const points = bboxToPoints(obj.bbox);
       const color = colors[index % colors.length];
       const active = index === state.selectedObjectIndex;
+      const hovered = active && state.hoverTarget.kind === "object";
       if (state.showBoxes) {
-        drawPolygon(points, color, "rgba(37,99,235,0.14)", active);
+        drawPolygon(points, color, "rgba(37,99,235,0.14)", active, hovered);
+        if (active && state.hoverTarget.kind === "edge") drawHoverEdge(points, state.hoverTarget.index);
         drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
       }
       if (state.showKeypoints) {
@@ -1520,6 +1684,7 @@
     }
 
     cancelDeferredRender();
+    setHoverTarget({ kind: "none", index: -1 });
     state.pendingKeypointPlacement = null;
     state.currentImage = nextName;
     state.currentImageIndex = nextName ? state.imageNames.indexOf(nextName) : -1;
@@ -1588,16 +1753,18 @@
     if (yInput) yInput.value = String(point[1]);
   }
 
+  function clampCurrentObjectsToImage() {
+    const width = els.mainImage.naturalWidth || 0;
+    const height = els.mainImage.naturalHeight || 0;
+    if (!width || !height) return;
+    currentObjects().forEach(function clampObject(obj) {
+      obj.bbox = clampBboxToImage(obj.bbox, width, height);
+    });
+  }
+
   function applyEditor() {
     const obj = currentObject();
     if (!obj) return;
-    obj.labels = els.labelsEditor.value
-      .split(/\r?\n/)
-      .map(function trim(item) {
-        return item.trim();
-      })
-      .filter(Boolean);
-
     const inputs = Array.from(els.bboxGrid.querySelectorAll("input"));
     const next = inputs.map(function toNumber(input) {
       return Number(input.value);
@@ -1606,7 +1773,16 @@
       setStatus("bbox 必须保持 8 个有效数字", 0);
       return;
     }
-    obj.bbox = next;
+    recordUndoSnapshot();
+    obj.labels = els.labelsEditor.value
+      .split(/\r?\n/)
+      .map(function trim(item) {
+        return item.trim();
+      })
+      .filter(Boolean);
+    const width = els.mainImage.naturalWidth || 0;
+    const height = els.mainImage.naturalHeight || 0;
+    obj.bbox = width && height ? clampBboxToImage(next, width, height) : next;
     refreshImageMeta(state.currentImage);
     refreshLabelOptions();
     renderImageControls();
@@ -1619,6 +1795,7 @@
     if (!obj) return;
     const keypoints = ensureObjectKeypoints(obj);
     const rows = Array.from(els.keypointList.querySelectorAll(".keypoint-row"));
+    const values = [];
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       const pointIndex = Number(row.dataset.keypointIndex);
@@ -1628,10 +1805,18 @@
         setStatus("关键点坐标必须是有效数字", 0);
         return;
       }
+      values.push({ row, pointIndex, x, y });
+    }
+    recordUndoSnapshot();
+    values.forEach(function applyKeypointValue(value) {
+      const row = value.row;
+      const pointIndex = value.pointIndex;
+      const x = value.x;
+      const y = value.y;
       keypoints.points[pointIndex] = [x, y];
       const name = row.querySelector('[data-keypoint-field="name"]').value.trim();
       keypoints.names[pointIndex] = name || getDefaultKeypointName(pointIndex);
-    }
+    });
     refreshImageMeta(state.currentImage);
     setStatus("已应用关键点修改", 100);
     renderOverlay();
@@ -1678,6 +1863,7 @@
       return true;
     }
 
+    recordUndoSnapshot();
     const keypoints = ensureObjectKeypoints(obj);
     let pointIndex = keypoints.points.findIndex(isMissingKeypoint);
     if (pointIndex < 0) pointIndex = keypoints.points.length;
@@ -1697,6 +1883,7 @@
     if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return;
     if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= obj.keypoints.points.length) return;
     // Keep the original slot so fixed-index keypoint names remain aligned.
+    recordUndoSnapshot();
     obj.keypoints.points[pointIndex] = ["null"];
     refreshImageMeta(state.currentImage);
     renderImageControls();
@@ -1713,6 +1900,7 @@
     const right = Math.round(width * 0.65);
     const bottom = Math.round(height * 0.65);
     const objects = currentObjects();
+    recordUndoSnapshot();
     objects.push({
       labels: ["new_object"],
       bbox: [left, top, right, top, right, bottom, left, bottom],
@@ -1730,6 +1918,7 @@
   function deleteObject() {
     const objects = currentObjects();
     if (state.selectedObjectIndex < 0 || state.selectedObjectIndex >= objects.length) return;
+    recordUndoSnapshot();
     objects.splice(state.selectedObjectIndex, 1);
     state.selectedObjectIndex = Math.min(state.selectedObjectIndex, objects.length - 1);
     refreshImageMeta(state.currentImage);
@@ -1804,6 +1993,8 @@
   function startPan(event) {
     if (state.batchPreview) return;
     if (event.button !== 0 || state.drag || !state.currentImage) return;
+    els.canvasShell.classList.remove("is-object-target");
+    setHoverTarget({ kind: "none", index: -1 });
     if (isKeypointPlacementPending()) {
       if (event.target.closest && event.target.closest("button, input, textarea, select")) return;
       event.preventDefault();
@@ -1813,6 +2004,7 @@
     const keypointIndex = state.showKeypoints ? findKeypointHit(coords.x, coords.y) : -1;
     if (keypointIndex >= 0) {
       event.preventDefault();
+      recordUndoSnapshot();
       state.drag = { kind: "keypoint", objectIndex: state.selectedObjectIndex, pointIndex: keypointIndex };
       els.canvasShell.setPointerCapture(event.pointerId);
       return;
@@ -1820,7 +2012,17 @@
     const handleIndex = findHandleHit(coords.x, coords.y);
     if (handleIndex >= 0) {
       event.preventDefault();
+      recordUndoSnapshot();
       state.drag = { kind: "bbox", objectIndex: state.selectedObjectIndex, pointIndex: handleIndex };
+      els.canvasShell.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    const edgeIndex = findRectangleEdgeHit(coords.x, coords.y);
+    if (edgeIndex >= 0) {
+      event.preventDefault();
+      recordUndoSnapshot();
+      state.drag = { kind: "bbox-edge", objectIndex: state.selectedObjectIndex, edgeIndex };
       els.canvasShell.setPointerCapture(event.pointerId);
       return;
     }
@@ -1832,6 +2034,7 @@
         selectObject(hitIndex);
         return;
       }
+      recordUndoSnapshot();
       state.drag = {
         kind: "object",
         objectIndex: hitIndex,
@@ -1858,6 +2061,7 @@
   }
 
   function movePan(event) {
+    if (!state.drag && !state.pan) updateObjectPointerCursor(event);
     if (state.drag) {
       const obj = currentObjects()[state.drag.objectIndex];
       if (!obj) return;
@@ -1870,7 +2074,13 @@
         return;
       }
       if (state.drag.kind === "object") {
-        obj.bbox = translateBbox(state.drag.bbox, coords.x - state.drag.startX, coords.y - state.drag.startY);
+        const width = els.mainImage.naturalWidth || 0;
+        const height = els.mainImage.naturalHeight || 0;
+        obj.bbox = width && height
+          ? translateBboxWithinImage(state.drag.bbox, coords.x - state.drag.startX, coords.y - state.drag.startY, width, height)
+          : translateBbox(state.drag.bbox, coords.x - state.drag.startX, coords.y - state.drag.startY);
+      } else if (getObjectBoxType(obj) === "rectangle" && state.drag.kind === "bbox-edge") {
+        obj.bbox = setRectangleEdgePosition(obj.bbox, state.drag.edgeIndex, Math.round(coords.x), Math.round(coords.y));
       } else if (getObjectBoxType(obj) === "rectangle") {
         obj.bbox = setRectangleHandlePosition(obj.bbox, state.drag.pointIndex, Math.round(coords.x), Math.round(coords.y));
       } else {
@@ -1878,6 +2088,9 @@
         obj.bbox[base] = Math.round(coords.x);
         obj.bbox[base + 1] = Math.round(coords.y);
       }
+      const width = els.mainImage.naturalWidth || 0;
+      const height = els.mainImage.naturalHeight || 0;
+      if (width && height) obj.bbox = clampBboxToImage(obj.bbox, width, height);
       updateEditorBboxInputs();
       els.bboxSizeText.textContent = formatBboxSize(obj.bbox);
       renderOverlay();
@@ -2165,6 +2378,7 @@
   });
   els.mainImage.addEventListener("load", function onload() {
     syncCanvasSize();
+    clampCurrentObjectsToImage();
     if (setKnownImageSize(state.currentImage, els.mainImage.naturalWidth || 0, els.mainImage.naturalHeight || 0)) {
       updateKnownSizeText();
       if (hasSizeFilters()) {
@@ -2262,6 +2476,10 @@
   els.canvasShell.addEventListener("pointermove", movePan);
   els.canvasShell.addEventListener("pointerup", endPan);
   els.canvasShell.addEventListener("pointercancel", endPan);
+  els.canvasShell.addEventListener("pointerleave", function onpointerleave() {
+    els.canvasShell.classList.remove("is-object-target");
+    setHoverTarget({ kind: "none", index: -1 });
+  });
   els.canvasShell.addEventListener("click", function onclick(event) {
     if (state.batchPreview) return;
     if (state.suppressNextClick) {
@@ -2279,19 +2497,29 @@
   }, true);
   document.addEventListener("keydown", function onkeydown(event) {
     if (shouldIgnoreImageShortcut(event)) return;
-    if (state.batchPreview && ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(event.key)) {
-      event.preventDefault();
-      moveBatchPreview(event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1);
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
+      if (state.undoHistory.size() > 0) {
+        event.preventDefault();
+        undoLastChange();
+      }
       return;
     }
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      selectAdjacentImage(-1);
+    if (event.key === "Delete") {
+      if (currentObject()) {
+        event.preventDefault();
+        deleteObject();
+      }
+      return;
     }
-    if (event.key === "ArrowRight") {
+    const navigationStep = getImageNavigationStep(event.key);
+    if (!navigationStep) return;
+    if (state.batchPreview) {
       event.preventDefault();
-      selectAdjacentImage(1);
+      moveBatchPreview(navigationStep);
+      return;
     }
+    event.preventDefault();
+    selectAdjacentImage(navigationStep);
   });
   window.addEventListener("resize", function onresize() {
     syncCanvasSize();

@@ -598,6 +598,10 @@ textarea {
   box-shadow: var(--shadow);
 }
 
+.canvas-shell.is-object-target {
+  cursor: pointer;
+}
+
 .canvas-shell.is-panning,
 .canvas-shell.is-panning * {
   cursor: grabbing;
