@@ -329,6 +329,7 @@ textarea {
 
 .filter-stack > input,
 .filter-stack > select,
+.label-multiselect-trigger,
 .range-inputs input {
   height: 27px;
   padding: 0 7px;
@@ -338,6 +339,117 @@ textarea {
 .filter-stack > select {
   width: 100%;
   min-width: 0;
+}
+
+.label-multiselect {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.label-multiselect-trigger {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding-right: 26px;
+  overflow: hidden;
+  color: var(--text);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-multiselect-trigger::after {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: "";
+  transform: translateY(-70%) rotate(45deg);
+}
+
+.label-multiselect.is-open .label-multiselect-trigger::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.label-multiselect-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 16%);
+  padding: 4px;
+}
+
+.label-multiselect-option {
+  display: flex;
+  width: 100%;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  padding: 4px 6px;
+  text-align: left;
+}
+
+.label-multiselect-option:hover {
+  background: var(--surface-2);
+}
+
+.label-multiselect-option.is-selected {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.label-multiselect-check {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.label-multiselect-option.is-selected .label-multiselect-check {
+  border-color: #2563eb;
+  background: #2563eb;
+}
+
+.label-multiselect-option.is-selected .label-multiselect-check::after {
+  width: 7px;
+  height: 4px;
+  border-bottom: 1.5px solid #fff;
+  border-left: 1.5px solid #fff;
+  content: "";
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.label-multiselect-option-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-multiselect-clear {
+  margin-bottom: 3px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 4px 4px 0 0;
+  color: var(--muted);
 }
 
 .filter-note #imageCount {

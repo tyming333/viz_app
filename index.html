@@ -67,9 +67,14 @@
               <input id="imageFilter" type="search" placeholder="筛选图片名" />
               <input id="labelFilter" type="search" placeholder="筛选 labels" />
               </div>
-              <select id="labelSelect" aria-label="从当前 JSON 的全部 labels 中选择" disabled>
-                <option value="">全部 labels</option>
-              </select>
+              <div id="labelSelect" class="label-multiselect is-disabled">
+                <button id="labelSelectButton" class="label-multiselect-trigger" type="button"
+                  aria-label="从当前 JSON 的全部 labels 中选择" aria-haspopup="listbox" aria-expanded="false" disabled>
+                  <span id="labelSelectText">全部 labels</span>
+                </button>
+                <div id="labelSelectMenu" class="label-multiselect-menu" role="listbox"
+                  aria-label="labels 多选列表" aria-multiselectable="true" hidden></div>
+              </div>
             <div class="filter-range-grid">
               <label class="range-field">
                 <span>宽度</span>

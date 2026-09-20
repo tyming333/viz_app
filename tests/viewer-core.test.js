@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   collectDataLabels,
+  orderLabelOptions,
   matchesLabelFilter,
   firstFilteredImageName,
   normalizeBatchGridSize,
@@ -48,6 +49,21 @@ test("uses an exact selected label instead of the fuzzy text filter", () => {
   assert.equal(matchesLabelFilter(["双螺母正常", "螺母"], "螺母", "双"), true);
   assert.equal(matchesLabelFilter(["双螺母正常"], "螺母", "双"), false);
   assert.equal(matchesLabelFilter(["BOLT"], "bolt", "unrelated"), true);
+});
+
+test("matches any selected dropdown label with OR semantics", () => {
+  assert.equal(matchesLabelFilter(["类别B"], ["类别A", "类别B"], "unrelated"), true);
+  assert.equal(matchesLabelFilter(["类别C"], ["类别A", "类别B"], "类别C"), false);
+  assert.equal(matchesLabelFilter([], [NEGATIVE_LABEL_FILTER, "类别A"], ""), true);
+  assert.equal(matchesLabelFilter(["类别A"], [NEGATIVE_LABEL_FILTER, "类别A"], ""), true);
+});
+
+test("moves selected label options to the top and restores their original order after cancellation", () => {
+  const labels = [NEGATIVE_LABEL_FILTER, "类别A", "类别B", "类别C"];
+
+  assert.deepEqual(orderLabelOptions(labels, ["类别C", "类别A"]), ["类别A", "类别C", NEGATIVE_LABEL_FILTER, "类别B"]);
+  assert.deepEqual(orderLabelOptions(labels, ["类别C"]), ["类别C", NEGATIVE_LABEL_FILTER, "类别A", "类别B"]);
+  assert.deepEqual(orderLabelOptions(labels, []), labels);
 });
 
 test("keeps fuzzy label matching when no dropdown label is selected", () => {

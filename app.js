@@ -4,6 +4,7 @@
   const {
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
+    orderLabelOptions,
     matchesLabelFilter,
     matchesOverlayLabelFilter,
     firstFilteredImageName,
@@ -35,6 +36,9 @@
     imageFilter: document.getElementById("imageFilter"),
     labelFilter: document.getElementById("labelFilter"),
     labelSelect: document.getElementById("labelSelect"),
+    labelSelectButton: document.getElementById("labelSelectButton"),
+    labelSelectText: document.getElementById("labelSelectText"),
+    labelSelectMenu: document.getElementById("labelSelectMenu"),
     widthMinFilter: document.getElementById("widthMinFilter"),
     widthMaxFilter: document.getElementById("widthMaxFilter"),
     heightMinFilter: document.getElementById("heightMinFilter"),
@@ -104,12 +108,14 @@
     appliedFilters: {
       image: "",
       label: "",
-      labelExact: "",
+      labelExact: [],
       widthMin: "",
       widthMax: "",
       heightMin: "",
       heightMax: ""
     },
+    labelOptions: [],
+    labelSelections: [],
     imageMeta: new Map(),
     knownImageSizes: new Map(),
     currentImage: "",
@@ -529,32 +535,73 @@
     state.imageMeta.set(name, buildImageMeta(name));
   }
 
+  function labelOptionText(value) {
+    return value === NEGATIVE_LABEL_FILTER ? "负样本（无 labels）" : value;
+  }
+
+  function setLabelSelectOpen(open) {
+    const nextOpen = !!open && !els.labelSelectButton.disabled;
+    els.labelSelect.classList.toggle("is-open", nextOpen);
+    els.labelSelectButton.setAttribute("aria-expanded", String(nextOpen));
+    els.labelSelectMenu.hidden = !nextOpen;
+  }
+
   function renderLabelOptions(labels) {
     const items = Array.isArray(labels) ? labels : [];
-    const current = els.labelSelect.value || state.appliedFilters.labelExact;
+    const originalOptions = [NEGATIVE_LABEL_FILTER].concat(items);
+    const availableKeys = new Set(originalOptions.map(function getOptionKey(value) {
+      return String(value).toLocaleLowerCase("zh-CN");
+    }));
+    state.labelOptions = items.slice();
+    state.labelSelections = state.labelSelections.filter(function keepAvailable(value) {
+      return availableKeys.has(String(value).toLocaleLowerCase("zh-CN"));
+    });
+
+    const selectedKeys = new Set(state.labelSelections.map(function getSelectedKey(value) {
+      return String(value).toLocaleLowerCase("zh-CN");
+    }));
     const fragment = document.createDocumentFragment();
-    const allOption = document.createElement("option");
-    allOption.value = "";
-    allOption.textContent = "全部 labels";
-    fragment.appendChild(allOption);
-    const negativeOption = document.createElement("option");
-    negativeOption.value = NEGATIVE_LABEL_FILTER;
-    negativeOption.textContent = "负样本（无 labels）";
-    fragment.appendChild(negativeOption);
-    items.forEach(function addLabelOption(label) {
-      const option = document.createElement("option");
-      option.value = label;
-      option.textContent = label;
+    const clearOption = document.createElement("button");
+    clearOption.type = "button";
+    clearOption.className = "label-multiselect-option label-multiselect-clear";
+    clearOption.dataset.action = "clear-labels";
+    clearOption.textContent = "全部 labels";
+    fragment.appendChild(clearOption);
+
+    orderLabelOptions(originalOptions, state.labelSelections).forEach(function addLabelOption(value) {
+      const selected = selectedKeys.has(String(value).toLocaleLowerCase("zh-CN"));
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "label-multiselect-option" + (selected ? " is-selected" : "");
+      option.dataset.labelValue = value;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(selected));
+
+      const check = document.createElement("span");
+      check.className = "label-multiselect-check";
+      check.setAttribute("aria-hidden", "true");
+      const text = document.createElement("span");
+      text.className = "label-multiselect-option-text";
+      text.textContent = labelOptionText(value);
+      option.append(check, text);
       fragment.appendChild(option);
     });
-    els.labelSelect.replaceChildren(fragment);
-    els.labelSelect.disabled = !state.data;
-    if (current === NEGATIVE_LABEL_FILTER || items.includes(current)) {
-      els.labelSelect.value = current;
-      return;
+    els.labelSelectMenu.replaceChildren(fragment);
+
+    const disabled = !state.data;
+    els.labelSelectButton.disabled = disabled;
+    els.labelSelect.classList.toggle("is-disabled", disabled);
+    if (disabled) setLabelSelectOpen(false);
+    if (!state.labelSelections.length) {
+      els.labelSelectText.textContent = "全部 labels";
+      els.labelSelectButton.title = "";
+    } else {
+      const selectedText = state.labelSelections.map(labelOptionText).join("、");
+      els.labelSelectText.textContent = state.labelSelections.length === 1
+        ? selectedText
+        : "已选 " + state.labelSelections.length + " 个 labels";
+      els.labelSelectButton.title = selectedText;
     }
-    els.labelSelect.value = "";
-    if (state.appliedFilters.labelExact === current) state.appliedFilters.labelExact = "";
   }
 
   function refreshLabelOptions() {
@@ -774,12 +821,14 @@
   function clearFilters() {
     els.imageFilter.value = "";
     els.labelFilter.value = "";
-    els.labelSelect.value = "";
+    state.labelSelections = [];
+    renderLabelOptions(state.labelOptions);
+    setLabelSelectOpen(false);
     els.widthMinFilter.value = "";
     els.widthMaxFilter.value = "";
     els.heightMinFilter.value = "";
     els.heightMaxFilter.value = "";
-    state.appliedFilters = { image: "", label: "", labelExact: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
+    state.appliedFilters = { image: "", label: "", labelExact: [], widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
     renderAnnotationOverlays();
@@ -789,7 +838,7 @@
     state.appliedFilters = {
       image: els.imageFilter.value,
       label: els.labelFilter.value,
-      labelExact: els.labelSelect.value,
+      labelExact: state.labelSelections.slice(),
       widthMin: els.widthMinFilter.value,
       widthMax: els.widthMaxFilter.value,
       heightMin: els.heightMinFilter.value,
@@ -2504,11 +2553,41 @@
   });
   els.applyFiltersBtn.addEventListener("click", applyFilters);
   els.clearFiltersBtn.addEventListener("click", clearFilters);
-  els.labelSelect.addEventListener("change", function onLabelSelectChange() {
-    if (els.labelSelect.value) els.labelFilter.value = "";
+  els.labelSelectButton.addEventListener("click", function onLabelSelectButtonClick() {
+    setLabelSelectOpen(els.labelSelectMenu.hidden);
+  });
+  els.labelSelectMenu.addEventListener("click", function onLabelSelectMenuClick(event) {
+    const option = event.target.closest ? event.target.closest("button") : null;
+    if (!option) return;
+    if (option.dataset.action === "clear-labels") {
+      state.labelSelections = [];
+    } else if (option.dataset.labelValue) {
+      const value = option.dataset.labelValue;
+      const valueKey = value.toLocaleLowerCase("zh-CN");
+      const selectedIndex = state.labelSelections.findIndex(function findSelected(item) {
+        return item.toLocaleLowerCase("zh-CN") === valueKey;
+      });
+      if (selectedIndex >= 0) state.labelSelections.splice(selectedIndex, 1);
+      else state.labelSelections.push(value);
+    }
+    if (state.labelSelections.length) els.labelFilter.value = "";
+    renderLabelOptions(state.labelOptions);
+    setLabelSelectOpen(true);
   });
   els.labelFilter.addEventListener("input", function onLabelFilterInput() {
-    if (els.labelFilter.value.trim()) els.labelSelect.value = "";
+    if (!els.labelFilter.value.trim() || !state.labelSelections.length) return;
+    state.labelSelections = [];
+    renderLabelOptions(state.labelOptions);
+  });
+  document.addEventListener("click", function closeLabelSelectOutside(event) {
+    if (!event.composedPath().includes(els.labelSelect)) setLabelSelectOpen(false);
+  });
+  els.labelSelect.addEventListener("keydown", function closeLabelSelectWithEscape(event) {
+    if (event.key !== "Escape" || els.labelSelectMenu.hidden) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setLabelSelectOpen(false);
+    els.labelSelectButton.focus();
   });
   [els.imageFilter, els.labelFilter, els.widthMinFilter, els.widthMaxFilter, els.heightMinFilter, els.heightMaxFilter]
     .forEach(function bindFilterEnter(input) {

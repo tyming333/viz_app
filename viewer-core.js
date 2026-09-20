@@ -33,20 +33,33 @@
     });
   }
 
+  function orderLabelOptions(labels, selectedLabels) {
+    const items = Array.isArray(labels) ? labels : [];
+    const selectedKeys = new Set((Array.isArray(selectedLabels) ? selectedLabels : [selectedLabels])
+      .map(labelKey)
+      .filter(Boolean));
+    return items.filter(function isSelected(label) {
+      return selectedKeys.has(labelKey(label));
+    }).concat(items.filter(function isNotSelected(label) {
+      return !selectedKeys.has(labelKey(label));
+    }));
+  }
+
   function matchesLabelFilter(labels, exactLabel, fuzzyText) {
     const items = Array.isArray(labels) ? labels : [];
-    if (exactLabel === NEGATIVE_LABEL_FILTER) {
-      return !items.some(function hasNonEmptyLabel(label) {
-        return normalizeLabel(label) !== "";
-      });
-    }
-    const exactKey = labelKey(exactLabel);
+    const exactLabels = (Array.isArray(exactLabel) ? exactLabel : [exactLabel])
+      .map(normalizeLabel)
+      .filter(Boolean);
+    const exactKeys = new Set(exactLabels.map(labelKey));
     const fuzzyKey = labelKey(fuzzyText);
 
-    // A dropdown choice is an exact label filter; free text remains a fuzzy fallback.
-    if (exactKey) {
+    // Dropdown selections use OR matching; free text remains a fuzzy fallback.
+    if (exactKeys.size) {
+      if (exactKeys.has(labelKey(NEGATIVE_LABEL_FILTER)) && !items.some(function hasNonEmptyLabel(label) {
+        return normalizeLabel(label) !== "";
+      })) return true;
       return items.some(function matchesExact(label) {
-        return labelKey(label) === exactKey;
+        return exactKeys.has(labelKey(label));
       });
     }
     if (fuzzyKey) {
@@ -242,6 +255,7 @@
   return {
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
+    orderLabelOptions,
     matchesLabelFilter,
     matchesOverlayLabelFilter,
     firstFilteredImageName,
