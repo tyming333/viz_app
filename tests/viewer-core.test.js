@@ -15,7 +15,8 @@ const {
   createUndoHistory,
   resolveHoverTarget,
   getImageNavigationStep,
-  NEGATIVE_LABEL_FILTER
+  NEGATIVE_LABEL_FILTER,
+  matchesOverlayLabelFilter
 } = require("../viewer-core.js");
 
 test("collects unique non-empty labels from the entire imported JSON", () => {
@@ -57,6 +58,12 @@ test("matches negative samples only when the image has no non-empty labels", () 
   assert.equal(matchesLabelFilter([], NEGATIVE_LABEL_FILTER, ""), true);
   assert.equal(matchesLabelFilter(["", "   "], NEGATIVE_LABEL_FILTER, ""), true);
   assert.equal(matchesLabelFilter(["", "缺陷"], NEGATIVE_LABEL_FILTER, ""), false);
+});
+
+test("show-all overlay mode bypasses labels filtering until it is cancelled", () => {
+  assert.equal(matchesOverlayLabelFilter(["类别B"], "类别A", "", false), false);
+  assert.equal(matchesOverlayLabelFilter(["类别B"], "类别A", "", true), true);
+  assert.equal(matchesOverlayLabelFilter(["类别B"], "类别A", "", false), false);
 });
 
 test("chooses the first filtered image and clears the target for an empty result", () => {

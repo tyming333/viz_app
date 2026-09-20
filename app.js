@@ -5,6 +5,7 @@
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     matchesLabelFilter,
+    matchesOverlayLabelFilter,
     firstFilteredImageName,
     isAxisAlignedRectangle,
     setRectangleHandlePosition,
@@ -119,6 +120,7 @@
     pan: null,
     pendingKeypointPlacement: null,
     showBoxes: true,
+    showAllOverlayObjects: false,
     showBoxFill: true,
     showKeypoints: true,
     showKeypointLabels: true,
@@ -778,6 +780,7 @@
     state.appliedFilters = { image: "", label: "", labelExact: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
+    renderOverlay();
   }
 
   function applyFilters() {
@@ -793,6 +796,7 @@
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
     selectImage(firstFilteredImageName(state.filteredImageNames), { scrollList: true });
+    renderOverlay();
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
 
@@ -1245,6 +1249,9 @@
     els.boxVisibilityBtn.classList.toggle("active", state.showBoxes);
     els.boxVisibilityBtn.setAttribute("aria-pressed", String(state.showBoxes));
     els.boxVisibilityBtn.title = state.showBoxes ? "隐藏所有框" : "显示所有框";
+    els.showAllBoxesBtn.classList.toggle("active", state.showAllOverlayObjects);
+    els.showAllBoxesBtn.setAttribute("aria-pressed", String(state.showAllOverlayObjects));
+    els.showAllBoxesBtn.textContent = state.showAllOverlayObjects ? "取消显示所有框" : "显示所有框";
   }
 
   function renderFillToggle() {
@@ -1252,8 +1259,9 @@
     els.fillToggleBtn.setAttribute("aria-pressed", String(state.showBoxFill));
   }
 
-  function showAllBoxes() {
-    state.showBoxes = true;
+  function toggleShowAllBoxes() {
+    state.showAllOverlayObjects = !state.showAllOverlayObjects;
+    if (state.showAllOverlayObjects) state.showBoxes = true;
     renderBoxVisibilityToggle();
     renderOverlay();
   }
@@ -1558,7 +1566,12 @@
     const objects = currentObjects();
     objects.forEach(function eachObject(obj, index) {
       const labels = Array.isArray(obj.labels) ? obj.labels : [];
-      if (!matchesLabelFilter(labels, state.appliedFilters.labelExact, state.appliedFilters.label)) return;
+      if (!matchesOverlayLabelFilter(
+        labels,
+        state.appliedFilters.labelExact,
+        state.appliedFilters.label,
+        state.showAllOverlayObjects
+      )) return;
       const points = bboxToPoints(obj.bbox);
       const color = colors[index % colors.length];
       const active = index === state.selectedObjectIndex;
@@ -2418,7 +2431,7 @@
     renderFillToggle();
     renderOverlay();
   });
-  els.showAllBoxesBtn.addEventListener("click", showAllBoxes);
+  els.showAllBoxesBtn.addEventListener("click", toggleShowAllBoxes);
   els.keypointVisibilityBtn.addEventListener("click", function onkeypoints() {
     state.showKeypoints = !state.showKeypoints;
     renderKeypointVisibilityToggle();

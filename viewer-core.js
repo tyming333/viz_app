@@ -57,6 +57,10 @@
     return true;
   }
 
+  function matchesOverlayLabelFilter(labels, exactLabel, fuzzyText, showAllObjects) {
+    return !!showAllObjects || matchesLabelFilter(labels, exactLabel, fuzzyText);
+  }
+
   function firstFilteredImageName(imageNames) {
     return Array.isArray(imageNames) && imageNames.length ? String(imageNames[0] || "") : "";
   }
@@ -219,6 +223,7 @@
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     matchesLabelFilter,
+    matchesOverlayLabelFilter,
     firstFilteredImageName,
     isAxisAlignedRectangle,
     setRectangleHandlePosition,
