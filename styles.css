@@ -319,11 +319,89 @@ textarea {
   gap: 8px;
 }
 
-.filter-text-row input {
+.filter-text-row > input {
   min-width: 0;
   flex: 1;
   height: 27px;
   padding: 0 7px;
+  font-size: 11px;
+}
+
+.label-filter-combobox {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.label-filter-field {
+  display: flex;
+  width: 100%;
+  height: 27px;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfe;
+  padding: 2px 5px;
+}
+
+.label-filter-field:focus-within {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgb(96 165 250 / 18%);
+}
+
+.label-filter-field input {
+  width: 100%;
+  min-width: 58px;
+  height: 21px;
+  flex: 1 0 58px;
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 11px;
+}
+
+.label-filter-selections {
+  display: contents;
+}
+
+.label-filter-chip {
+  display: inline-flex;
+  height: 20px;
+  max-width: 112px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid #93c5fd;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+.label-filter-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.label-filter-chip-remove {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.label-filter-menu {
+  z-index: 30;
+}
+
+.label-filter-empty {
+  padding: 7px 6px;
+  color: var(--muted);
   font-size: 11px;
 }
 

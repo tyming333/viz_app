@@ -4,6 +4,7 @@
   const {
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
+    filterLabelOptions,
     orderLabelOptions,
     matchesLabelFilter,
     matchesOverlayLabelFilter,
@@ -35,6 +36,9 @@
     imageCount: document.getElementById("imageCount"),
     imageFilter: document.getElementById("imageFilter"),
     labelFilter: document.getElementById("labelFilter"),
+    labelFilterCombobox: document.getElementById("labelFilterCombobox"),
+    labelFilterSelections: document.getElementById("labelFilterSelections"),
+    labelFilterMenu: document.getElementById("labelFilterMenu"),
     labelSelect: document.getElementById("labelSelect"),
     labelSelectButton: document.getElementById("labelSelectButton"),
     labelSelectText: document.getElementById("labelSelectText"),
@@ -539,27 +543,108 @@
     return value === NEGATIVE_LABEL_FILTER ? "负样本（无 labels）" : value;
   }
 
+  function labelValueKey(value) {
+    return String(value).toLocaleLowerCase("zh-CN");
+  }
+
+  function isLabelSelected(value) {
+    const valueKey = labelValueKey(value);
+    return state.labelSelections.some(function matchesSelection(item) {
+      return labelValueKey(item) === valueKey;
+    });
+  }
+
+  function toggleLabelSelection(value) {
+    const valueKey = labelValueKey(value);
+    const selectedIndex = state.labelSelections.findIndex(function findSelected(item) {
+      return labelValueKey(item) === valueKey;
+    });
+    if (selectedIndex >= 0) state.labelSelections.splice(selectedIndex, 1);
+    else state.labelSelections.push(value);
+  }
+
+  function createLabelOption(value) {
+    const selected = isLabelSelected(value);
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "label-multiselect-option" + (selected ? " is-selected" : "");
+    option.dataset.labelValue = value;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", String(selected));
+
+    const check = document.createElement("span");
+    check.className = "label-multiselect-check";
+    check.setAttribute("aria-hidden", "true");
+    const text = document.createElement("span");
+    text.className = "label-multiselect-option-text";
+    text.textContent = labelOptionText(value);
+    option.append(check, text);
+    return option;
+  }
+
+  function setLabelFilterMenuOpen(open) {
+    const nextOpen = !!open && !!state.data;
+    els.labelFilter.setAttribute("aria-expanded", String(nextOpen));
+    els.labelFilterMenu.hidden = !nextOpen;
+  }
+
+  function renderLabelFilterSelections() {
+    const fragment = document.createDocumentFragment();
+    state.labelSelections.forEach(function addSelection(value) {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "label-filter-chip";
+      chip.dataset.labelValue = value;
+      chip.title = "取消选择 " + labelOptionText(value);
+
+      const text = document.createElement("span");
+      text.className = "label-filter-chip-text";
+      text.textContent = labelOptionText(value);
+      const remove = document.createElement("span");
+      remove.className = "label-filter-chip-remove";
+      remove.textContent = "×";
+      remove.setAttribute("aria-hidden", "true");
+      chip.append(text, remove);
+      fragment.appendChild(chip);
+    });
+    els.labelFilterSelections.replaceChildren(fragment);
+  }
+
+  function renderLabelFilterSuggestions() {
+    const allOptions = [NEGATIVE_LABEL_FILTER].concat(state.labelOptions);
+    const matches = filterLabelOptions(allOptions, els.labelFilter.value);
+    const orderedMatches = orderLabelOptions(matches, state.labelSelections);
+    const fragment = document.createDocumentFragment();
+    orderedMatches.forEach(function addSuggestion(value) {
+      fragment.appendChild(createLabelOption(value));
+    });
+    if (!orderedMatches.length) {
+      const empty = document.createElement("div");
+      empty.className = "label-filter-empty";
+      empty.textContent = "无匹配 labels";
+      fragment.appendChild(empty);
+    }
+    els.labelFilterMenu.replaceChildren(fragment);
+  }
+
   function setLabelSelectOpen(open) {
+    const wasOpen = !els.labelSelectMenu.hidden;
     const nextOpen = !!open && !els.labelSelectButton.disabled;
     els.labelSelect.classList.toggle("is-open", nextOpen);
     els.labelSelectButton.setAttribute("aria-expanded", String(nextOpen));
     els.labelSelectMenu.hidden = !nextOpen;
+    if (nextOpen && !wasOpen) els.labelSelectMenu.scrollTop = 0;
   }
 
   function renderLabelOptions(labels) {
     const items = Array.isArray(labels) ? labels : [];
     const originalOptions = [NEGATIVE_LABEL_FILTER].concat(items);
-    const availableKeys = new Set(originalOptions.map(function getOptionKey(value) {
-      return String(value).toLocaleLowerCase("zh-CN");
-    }));
+    const availableKeys = new Set(originalOptions.map(labelValueKey));
     state.labelOptions = items.slice();
     state.labelSelections = state.labelSelections.filter(function keepAvailable(value) {
-      return availableKeys.has(String(value).toLocaleLowerCase("zh-CN"));
+      return availableKeys.has(labelValueKey(value));
     });
 
-    const selectedKeys = new Set(state.labelSelections.map(function getSelectedKey(value) {
-      return String(value).toLocaleLowerCase("zh-CN");
-    }));
     const fragment = document.createDocumentFragment();
     const clearOption = document.createElement("button");
     clearOption.type = "button";
@@ -569,22 +654,7 @@
     fragment.appendChild(clearOption);
 
     orderLabelOptions(originalOptions, state.labelSelections).forEach(function addLabelOption(value) {
-      const selected = selectedKeys.has(String(value).toLocaleLowerCase("zh-CN"));
-      const option = document.createElement("button");
-      option.type = "button";
-      option.className = "label-multiselect-option" + (selected ? " is-selected" : "");
-      option.dataset.labelValue = value;
-      option.setAttribute("role", "option");
-      option.setAttribute("aria-selected", String(selected));
-
-      const check = document.createElement("span");
-      check.className = "label-multiselect-check";
-      check.setAttribute("aria-hidden", "true");
-      const text = document.createElement("span");
-      text.className = "label-multiselect-option-text";
-      text.textContent = labelOptionText(value);
-      option.append(check, text);
-      fragment.appendChild(option);
+      fragment.appendChild(createLabelOption(value));
     });
     els.labelSelectMenu.replaceChildren(fragment);
 
@@ -602,6 +672,8 @@
         : "已选 " + state.labelSelections.length + " 个 labels";
       els.labelSelectButton.title = selectedText;
     }
+    renderLabelFilterSelections();
+    renderLabelFilterSuggestions();
   }
 
   function refreshLabelOptions() {
@@ -823,6 +895,7 @@
     els.labelFilter.value = "";
     state.labelSelections = [];
     renderLabelOptions(state.labelOptions);
+    setLabelFilterMenuOpen(false);
     setLabelSelectOpen(false);
     els.widthMinFilter.value = "";
     els.widthMaxFilter.value = "";
@@ -835,6 +908,7 @@
   }
 
   function applyFilters() {
+    // Selected labels use OR matching; without selections, the typed text keeps fuzzy matching.
     state.appliedFilters = {
       image: els.imageFilter.value,
       label: els.labelFilter.value,
@@ -2562,25 +2636,38 @@
     if (option.dataset.action === "clear-labels") {
       state.labelSelections = [];
     } else if (option.dataset.labelValue) {
-      const value = option.dataset.labelValue;
-      const valueKey = value.toLocaleLowerCase("zh-CN");
-      const selectedIndex = state.labelSelections.findIndex(function findSelected(item) {
-        return item.toLocaleLowerCase("zh-CN") === valueKey;
-      });
-      if (selectedIndex >= 0) state.labelSelections.splice(selectedIndex, 1);
-      else state.labelSelections.push(value);
+      toggleLabelSelection(option.dataset.labelValue);
     }
     if (state.labelSelections.length) els.labelFilter.value = "";
     renderLabelOptions(state.labelOptions);
     setLabelSelectOpen(true);
   });
   els.labelFilter.addEventListener("input", function onLabelFilterInput() {
-    if (!els.labelFilter.value.trim() || !state.labelSelections.length) return;
-    state.labelSelections = [];
+    renderLabelFilterSuggestions();
+    setLabelFilterMenuOpen(!!els.labelFilter.value.trim());
+  });
+  els.labelFilter.addEventListener("focus", function onLabelFilterFocus() {
+    if (els.labelFilter.value.trim()) setLabelFilterMenuOpen(true);
+  });
+  els.labelFilterMenu.addEventListener("click", function onLabelFilterMenuClick(event) {
+    const option = event.target.closest ? event.target.closest("button[data-label-value]") : null;
+    if (!option) return;
+    toggleLabelSelection(option.dataset.labelValue);
+    els.labelFilter.value = "";
     renderLabelOptions(state.labelOptions);
+    setLabelFilterMenuOpen(false);
+    els.labelFilter.focus();
+  });
+  els.labelFilterSelections.addEventListener("click", function onLabelFilterSelectionClick(event) {
+    const chip = event.target.closest ? event.target.closest("button[data-label-value]") : null;
+    if (!chip) return;
+    toggleLabelSelection(chip.dataset.labelValue);
+    renderLabelOptions(state.labelOptions);
+    els.labelFilter.focus();
   });
   document.addEventListener("click", function closeLabelSelectOutside(event) {
     if (!event.composedPath().includes(els.labelSelect)) setLabelSelectOpen(false);
+    if (!event.composedPath().includes(els.labelFilterCombobox)) setLabelFilterMenuOpen(false);
   });
   els.labelSelect.addEventListener("keydown", function closeLabelSelectWithEscape(event) {
     if (event.key !== "Escape" || els.labelSelectMenu.hidden) return;
@@ -2588,6 +2675,13 @@
     event.stopPropagation();
     setLabelSelectOpen(false);
     els.labelSelectButton.focus();
+  });
+  els.labelFilterCombobox.addEventListener("keydown", function closeLabelFilterWithEscape(event) {
+    if (event.key !== "Escape" || els.labelFilterMenu.hidden) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setLabelFilterMenuOpen(false);
+    els.labelFilter.focus();
   });
   [els.imageFilter, els.labelFilter, els.widthMinFilter, els.widthMaxFilter, els.heightMinFilter, els.heightMaxFilter]
     .forEach(function bindFilterEnter(input) {

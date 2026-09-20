@@ -33,6 +33,16 @@
     });
   }
 
+  function filterLabelOptions(labels, query) {
+    const items = Array.isArray(labels) ? labels : [];
+    const queryKey = labelKey(query);
+    if (!queryKey) return items.slice();
+    return items.filter(function matchesQuery(label) {
+      const searchValue = label === NEGATIVE_LABEL_FILTER ? "负样本（无 labels）" : label;
+      return labelKey(searchValue).includes(queryKey);
+    });
+  }
+
   function orderLabelOptions(labels, selectedLabels) {
     const items = Array.isArray(labels) ? labels : [];
     const selectedKeys = new Set((Array.isArray(selectedLabels) ? selectedLabels : [selectedLabels])
@@ -255,6 +265,7 @@
   return {
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
+    filterLabelOptions,
     orderLabelOptions,
     matchesLabelFilter,
     matchesOverlayLabelFilter,

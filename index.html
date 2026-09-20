@@ -65,7 +65,16 @@
             <div class="filter-stack">
               <div class="filter-text-row">
               <input id="imageFilter" type="search" placeholder="筛选图片名" />
-              <input id="labelFilter" type="search" placeholder="筛选 labels" />
+              <div id="labelFilterCombobox" class="label-filter-combobox">
+                <div id="labelFilterField" class="label-filter-field">
+                  <div id="labelFilterSelections" class="label-filter-selections"></div>
+                  <input id="labelFilter" type="search" placeholder="筛选 labels" role="combobox"
+                    aria-label="筛选 labels 或选择多个 labels" aria-autocomplete="list"
+                    aria-controls="labelFilterMenu" aria-expanded="false" />
+                </div>
+                <div id="labelFilterMenu" class="label-multiselect-menu label-filter-menu" role="listbox"
+                  aria-label="匹配的 labels" aria-multiselectable="true" hidden></div>
+              </div>
               </div>
               <div id="labelSelect" class="label-multiselect is-disabled">
                 <button id="labelSelectButton" class="label-multiselect-trigger" type="button"

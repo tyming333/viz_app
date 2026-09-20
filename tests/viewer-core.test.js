@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   collectDataLabels,
+  filterLabelOptions,
   orderLabelOptions,
   matchesLabelFilter,
   firstFilteredImageName,
@@ -64,6 +65,15 @@ test("moves selected label options to the top and restores their original order 
   assert.deepEqual(orderLabelOptions(labels, ["类别C", "类别A"]), ["类别A", "类别C", NEGATIVE_LABEL_FILTER, "类别B"]);
   assert.deepEqual(orderLabelOptions(labels, ["类别C"]), ["类别C", NEGATIVE_LABEL_FILTER, "类别A", "类别B"]);
   assert.deepEqual(orderLabelOptions(labels, []), labels);
+});
+
+test("filters label suggestions by contained text while preserving their original order", () => {
+  const labels = [NEGATIVE_LABEL_FILTER, "Bolt", "双螺母正常", "螺母缺失", "异物"];
+
+  assert.deepEqual(filterLabelOptions(labels, "螺母"), ["双螺母正常", "螺母缺失"]);
+  assert.deepEqual(filterLabelOptions(labels, "bolt"), ["Bolt"]);
+  assert.deepEqual(filterLabelOptions(labels, "负样本"), [NEGATIVE_LABEL_FILTER]);
+  assert.deepEqual(filterLabelOptions(labels, ""), labels);
 });
 
 test("keeps fuzzy label matching when no dropdown label is selected", () => {
