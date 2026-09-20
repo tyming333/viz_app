@@ -173,6 +173,22 @@
     return key === "Escape" || key === "Esc";
   }
 
+  function getContainTransform(sourceWidth, sourceHeight, containerWidth, containerHeight) {
+    if (![sourceWidth, sourceHeight, containerWidth, containerHeight].every(function isPositive(value) {
+      return Number.isFinite(value) && value > 0;
+    })) return null;
+    const scale = Math.min(containerWidth / sourceWidth, containerHeight / sourceHeight);
+    const width = sourceWidth * scale;
+    const height = sourceHeight * scale;
+    return {
+      scale,
+      offsetX: (containerWidth - width) / 2,
+      offsetY: (containerHeight - height) / 2,
+      width,
+      height
+    };
+  }
+
   function createUndoHistory(limit) {
     const maxEntries = Math.max(1, Math.floor(Number(limit) || 50));
     const entries = [];
@@ -237,6 +253,7 @@
     resolveHoverTarget,
     getImageNavigationStep,
     isCancelSelectionKey,
+    getContainTransform,
     createUndoHistory,
     normalizeBatchGridSize,
     getBatchPreviewWindow,

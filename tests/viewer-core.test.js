@@ -17,7 +17,8 @@ const {
   getImageNavigationStep,
   NEGATIVE_LABEL_FILTER,
   matchesOverlayLabelFilter,
-  isCancelSelectionKey
+  isCancelSelectionKey,
+  getContainTransform
 } = require("../viewer-core.js");
 
 test("collects unique non-empty labels from the entire imported JSON", () => {
@@ -168,4 +169,22 @@ test("recognizes Escape as the cancel-selection shortcut", () => {
   assert.equal(isCancelSelectionKey?.("Escape"), true);
   assert.equal(isCancelSelectionKey?.("Esc"), true);
   assert.equal(isCancelSelectionKey?.("Delete"), false);
+});
+
+test("calculates object-fit contain transforms for batch preview overlays", () => {
+  assert.deepEqual(getContainTransform?.(200, 100, 100, 100), {
+    scale: 0.5,
+    offsetX: 0,
+    offsetY: 25,
+    width: 100,
+    height: 50
+  });
+  assert.deepEqual(getContainTransform?.(100, 200, 100, 100), {
+    scale: 0.5,
+    offsetX: 25,
+    offsetY: 0,
+    width: 50,
+    height: 100
+  });
+  assert.equal(getContainTransform?.(0, 100, 100, 100), null);
 });

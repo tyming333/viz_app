@@ -15,6 +15,7 @@
     resolveHoverTarget,
     getImageNavigationStep,
     isCancelSelectionKey,
+    getContainTransform,
     createUndoHistory,
     normalizeBatchGridSize,
     getBatchPreviewWindow,
@@ -781,7 +782,7 @@
     state.appliedFilters = { image: "", label: "", labelExact: "", widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
-    renderOverlay();
+    renderAnnotationOverlays();
   }
 
   function applyFilters() {
@@ -797,7 +798,7 @@
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
     selectImage(firstFilteredImageName(state.filteredImageNames), { scrollList: true });
-    renderOverlay();
+    renderAnnotationOverlays();
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
 
@@ -992,6 +993,115 @@
     els.batchPreviewBtn.disabled = !active && !state.filteredImageNames.length;
   }
 
+  function drawBatchPreviewOverlay(canvas, image, imageName) {
+    const width = canvas.clientWidth || canvas.parentElement.clientWidth || 0;
+    const height = canvas.clientHeight || canvas.parentElement.clientHeight || 0;
+    const transform = getContainTransform(image.naturalWidth, image.naturalHeight, width, height);
+    if (!transform) return;
+    const dpr = window.devicePixelRatio || 1;
+    const context = canvas.getContext("2d");
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.clearRect(0, 0, width, height);
+    context.save();
+    context.translate(transform.offsetX, transform.offsetY);
+    context.scale(transform.scale, transform.scale);
+    context.beginPath();
+    context.rect(0, 0, image.naturalWidth, image.naturalHeight);
+    context.clip();
+
+    getObjects(imageName).forEach(function drawBatchObject(obj, objectIndex) {
+      const labels = Array.isArray(obj.labels) ? obj.labels : [];
+      if (!matchesOverlayLabelFilter(
+        labels,
+        state.appliedFilters.labelExact,
+        state.appliedFilters.label,
+        state.showAllOverlayObjects
+      )) return;
+      const points = bboxToPoints(obj.bbox);
+      const color = colors[objectIndex % colors.length];
+      const inverseScale = 1 / transform.scale;
+
+      if (state.showBoxes) {
+        context.save();
+        context.beginPath();
+        context.moveTo(points[0][0], points[0][1]);
+        for (let index = 1; index < points.length; index += 1) {
+          context.lineTo(points[index][0], points[index][1]);
+        }
+        context.closePath();
+        context.lineWidth = state.boxStrokeWidth * inverseScale;
+        context.strokeStyle = color;
+        if (state.showBoxFill) {
+          context.fillStyle = "rgba(37,99,235,0.14)";
+          context.fill();
+        }
+        context.stroke();
+
+        const label = labels.length ? labels[0] : "object " + (objectIndex + 1);
+        const minX = Math.min(points[0][0], points[1][0], points[2][0], points[3][0]);
+        const minY = Math.min(points[0][1], points[1][1], points[2][1], points[3][1]);
+        context.font = "700 " + Math.max(8, state.labelFontSize) * inverseScale + "px Microsoft YaHei";
+        context.textBaseline = "alphabetic";
+        context.lineJoin = "round";
+        context.lineWidth = Math.max(1.5, state.labelFontSize * 0.22) * inverseScale;
+        context.strokeStyle = "rgba(0,0,0,0.8)";
+        context.fillStyle = "#ffffff";
+        const labelY = Math.max(16 * inverseScale, minY - 8 * inverseScale);
+        context.strokeText(label, minX, labelY);
+        context.fillText(label, minX, labelY);
+        context.restore();
+      }
+
+      if (state.showKeypoints) {
+        const keypoints = getObjectKeypointPoints(obj);
+        context.save();
+        context.lineWidth = 1.5 * inverseScale;
+        context.strokeStyle = "#ffffff";
+        context.fillStyle = color;
+        keypoints.forEach(function drawBatchKeypoint(keypoint) {
+          context.beginPath();
+          context.arc(keypoint.point[0], keypoint.point[1], 4.5 * inverseScale, 0, Math.PI * 2);
+          context.fill();
+          context.stroke();
+          if (!state.showKeypointLabels) return;
+          const rawName = getObjectKeypointName(obj, keypoint.index);
+          const pointLabel = rawName === undefined || rawName === null || rawName === ""
+            ? "p" + (keypoint.index + 1)
+            : String(rawName);
+          context.font = "700 " + Math.max(8, state.labelFontSize - 2) * inverseScale + "px Microsoft YaHei";
+          context.lineWidth = Math.max(1.5, state.labelFontSize * 0.22) * inverseScale;
+          context.strokeStyle = "rgba(0,0,0,0.82)";
+          context.fillStyle = "#ffffff";
+          const x = keypoint.point[0] + 7 * inverseScale;
+          const y = keypoint.point[1] - 7 * inverseScale;
+          context.strokeText(pointLabel, x, y);
+          context.fillText(pointLabel, x, y);
+          context.strokeStyle = "#ffffff";
+          context.fillStyle = color;
+        });
+        context.restore();
+      }
+    });
+    context.restore();
+  }
+
+  function renderBatchPreviewOverlays() {
+    if (!state.batchPreview) return;
+    els.batchPreviewGrid.querySelectorAll(".batch-preview-overlay").forEach(function redrawBatchOverlay(canvas) {
+      const item = canvas.closest(".batch-preview-item");
+      const image = item && item.querySelector("img");
+      if (!item || !image || !image.complete || !image.naturalWidth) return;
+      drawBatchPreviewOverlay(canvas, image, item.dataset.batchImageName || "");
+    });
+  }
+
+  function renderAnnotationOverlays() {
+    renderOverlay();
+    if (state.batchPreview) renderBatchPreviewOverlays();
+  }
+
   function renderBatchPreview() {
     const names = state.filteredImageNames;
     const gridSize = normalizeBatchGridSize(state.batchGridSize);
@@ -1008,6 +1118,7 @@
       const absoluteIndex = previewWindow.start + localIndex;
       const button = document.createElement("button");
       const image = document.createElement("img");
+      const canvas = document.createElement("canvas");
       const caption = document.createElement("span");
       const number = document.createElement("span");
       const filename = document.createElement("span");
@@ -1015,6 +1126,7 @@
       button.type = "button";
       button.className = "batch-preview-item";
       button.dataset.batchImageIndex = String(absoluteIndex);
+      button.dataset.batchImageName = name;
       button.title = (absoluteIndex + 1) + ". " + name;
       image.src = imageUrl(name);
       image.alt = name;
@@ -1023,17 +1135,25 @@
       image.addEventListener("error", function onBatchImageError() {
         button.classList.add("is-error");
       });
+      image.addEventListener("load", function onBatchImageLoad() {
+        window.requestAnimationFrame(function drawLoadedBatchOverlay() {
+          drawBatchPreviewOverlay(canvas, image, name);
+        });
+      });
+      canvas.className = "batch-preview-overlay";
+      canvas.setAttribute("aria-hidden", "true");
       caption.className = "batch-preview-caption";
       number.className = "batch-preview-number";
       number.textContent = String(absoluteIndex + 1);
       filename.className = "batch-preview-filename";
       filename.textContent = name;
       caption.append(number, filename);
-      button.append(image, caption);
+      button.append(image, canvas, caption);
       fragment.appendChild(button);
     });
 
     els.batchPreviewGrid.replaceChildren(fragment);
+    window.requestAnimationFrame(renderBatchPreviewOverlays);
     els.batchProgressRange.min = "0";
     els.batchProgressRange.max = String(names.length);
     els.batchProgressRange.value = String(previewWindow.end);
@@ -1264,7 +1384,7 @@
     state.showAllOverlayObjects = !state.showAllOverlayObjects;
     if (state.showAllOverlayObjects) state.showBoxes = true;
     renderBoxVisibilityToggle();
-    renderOverlay();
+    renderAnnotationOverlays();
   }
 
   function renderKeypointVisibilityToggle() {
@@ -2445,33 +2565,33 @@
   els.boxVisibilityBtn.addEventListener("click", function onbox() {
     state.showBoxes = !state.showBoxes;
     renderBoxVisibilityToggle();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
   els.fillToggleBtn.addEventListener("click", function onfill() {
     state.showBoxFill = !state.showBoxFill;
     renderFillToggle();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
   els.showAllBoxesBtn.addEventListener("click", toggleShowAllBoxes);
   els.keypointVisibilityBtn.addEventListener("click", function onkeypoints() {
     state.showKeypoints = !state.showKeypoints;
     renderKeypointVisibilityToggle();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
   els.keypointLabelBtn.addEventListener("click", function onkeypointlabels() {
     state.showKeypointLabels = !state.showKeypointLabels;
     renderKeypointLabelToggle();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
   els.strokeWidthRange.addEventListener("input", function oninput(event) {
     state.boxStrokeWidth = Number(event.target.value) || 3;
     renderSliderValues();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
   els.labelSizeRange.addEventListener("input", function oninput(event) {
     state.labelFontSize = Number(event.target.value) || 13;
     renderSliderValues();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
   els.brightnessRange.addEventListener("input", function oninput(event) {
     state.imageBrightness = clampBrightness(Number(event.target.value) || 100);
@@ -2567,7 +2687,7 @@
   window.addEventListener("resize", function onresize() {
     syncCanvasSize();
     resetView();
-    renderOverlay();
+    renderAnnotationOverlays();
   });
 
   renderFull();
