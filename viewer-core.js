@@ -169,6 +169,10 @@
     return 0;
   }
 
+  function isCancelSelectionKey(key) {
+    return key === "Escape" || key === "Esc";
+  }
+
   function createUndoHistory(limit) {
     const maxEntries = Math.max(1, Math.floor(Number(limit) || 50));
     const entries = [];
@@ -232,6 +236,7 @@
     translateBboxWithinImage,
     resolveHoverTarget,
     getImageNavigationStep,
+    isCancelSelectionKey,
     createUndoHistory,
     normalizeBatchGridSize,
     getBatchPreviewWindow,

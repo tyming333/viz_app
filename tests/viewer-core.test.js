@@ -16,7 +16,8 @@ const {
   resolveHoverTarget,
   getImageNavigationStep,
   NEGATIVE_LABEL_FILTER,
-  matchesOverlayLabelFilter
+  matchesOverlayLabelFilter,
+  isCancelSelectionKey
 } = require("../viewer-core.js");
 
 test("collects unique non-empty labels from the entire imported JSON", () => {
@@ -161,4 +162,10 @@ test("maps WASD and arrow keys to adjacent image navigation", () => {
     assert.equal(getImageNavigationStep?.(key), 1);
   });
   assert.equal(getImageNavigationStep?.("Delete"), 0);
+});
+
+test("recognizes Escape as the cancel-selection shortcut", () => {
+  assert.equal(isCancelSelectionKey?.("Escape"), true);
+  assert.equal(isCancelSelectionKey?.("Esc"), true);
+  assert.equal(isCancelSelectionKey?.("Delete"), false);
 });

@@ -14,6 +14,7 @@
     translateBboxWithinImage,
     resolveHoverTarget,
     getImageNavigationStep,
+    isCancelSelectionKey,
     createUndoHistory,
     normalizeBatchGridSize,
     getBatchPreviewWindow,
@@ -1749,6 +1750,26 @@
     scrollSelectedObjectIntoView();
   }
 
+  function cancelCanvasSelection() {
+    const hadSelection = state.selectedObjectIndex >= 0
+      || !!state.pendingKeypointPlacement
+      || !!state.drag
+      || !!state.pan
+      || state.hoverTarget.kind !== "none";
+    state.selectedObjectIndex = -1;
+    state.pendingKeypointPlacement = null;
+    state.drag = null;
+    state.pan = null;
+    state.suppressNextClick = false;
+    els.canvasShell.classList.remove("is-panning", "is-object-target");
+    setHoverTarget({ kind: "none", index: -1 });
+    objectListView.rerender(-1);
+    renderEditor();
+    renderOverlay();
+    if (hadSelection) setStatus("已取消选中", 100);
+    return hadSelection;
+  }
+
   function updateEditorBboxInputs() {
     const obj = currentObject();
     if (!obj) return;
@@ -2514,6 +2535,10 @@
     }
   }, true);
   document.addEventListener("keydown", function onkeydown(event) {
+    if (isCancelSelectionKey(event.key)) {
+      if (cancelCanvasSelection()) event.preventDefault();
+      return;
+    }
     if (shouldIgnoreImageShortcut(event)) return;
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
       if (state.undoHistory.size() > 0) {
