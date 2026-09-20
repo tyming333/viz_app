@@ -395,8 +395,14 @@ textarea {
   line-height: 1;
 }
 
-.label-filter-menu {
+.label-multiselect-menu.label-filter-menu {
   z-index: 30;
+  /* 保持右侧对齐，按选项内容向左扩宽，并限制超长名称的面板宽度。 */
+  right: 0;
+  left: auto;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(280px, calc(100vw - 32px));
 }
 
 .label-filter-empty {
