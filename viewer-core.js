@@ -5,6 +5,8 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
+  const NEGATIVE_LABEL_FILTER = "__viz_negative_sample__";
+
   function normalizeLabel(value) {
     return String(value === undefined || value === null ? "" : value).trim();
   }
@@ -33,6 +35,11 @@
 
   function matchesLabelFilter(labels, exactLabel, fuzzyText) {
     const items = Array.isArray(labels) ? labels : [];
+    if (exactLabel === NEGATIVE_LABEL_FILTER) {
+      return !items.some(function hasNonEmptyLabel(label) {
+        return normalizeLabel(label) !== "";
+      });
+    }
     const exactKey = labelKey(exactLabel);
     const fuzzyKey = labelKey(fuzzyText);
 
@@ -209,6 +216,7 @@
   }
 
   return {
+    NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     matchesLabelFilter,
     firstFilteredImageName,

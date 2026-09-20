@@ -2,6 +2,7 @@
   "use strict";
 
   const {
+    NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     matchesLabelFilter,
     firstFilteredImageName,
@@ -532,6 +533,10 @@
     allOption.value = "";
     allOption.textContent = "全部 labels";
     fragment.appendChild(allOption);
+    const negativeOption = document.createElement("option");
+    negativeOption.value = NEGATIVE_LABEL_FILTER;
+    negativeOption.textContent = "负样本（无 labels）";
+    fragment.appendChild(negativeOption);
     items.forEach(function addLabelOption(label) {
       const option = document.createElement("option");
       option.value = label;
@@ -539,8 +544,8 @@
       fragment.appendChild(option);
     });
     els.labelSelect.replaceChildren(fragment);
-    els.labelSelect.disabled = items.length === 0;
-    if (items.includes(current)) {
+    els.labelSelect.disabled = !state.data;
+    if (current === NEGATIVE_LABEL_FILTER || items.includes(current)) {
       els.labelSelect.value = current;
       return;
     }
