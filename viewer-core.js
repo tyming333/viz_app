@@ -7,6 +7,30 @@
 
   const NEGATIVE_LABEL_FILTER = "__viz_negative_sample__";
 
+  function normalizeAdjustment(value, fallback, maximum) {
+    const parsed = Number(value);
+    return value === undefined || value === null || !Number.isFinite(parsed)
+      ? fallback : Math.max(0, Math.min(maximum, parsed));
+  }
+
+  function getImageAdjustmentFilter(settings) {
+    const values = settings || {};
+    const filter =
+      "brightness(" + (normalizeAdjustment(values.brightness, 100, 600) / 100).toFixed(2) + ") " +
+      "contrast(" + (normalizeAdjustment(values.contrast, 100, 600) / 100).toFixed(2) + ") " +
+      "saturate(" + (normalizeAdjustment(values.saturation, 100, 200) / 100).toFixed(2) + ") " +
+      "grayscale(" + (normalizeAdjustment(values.grayscale, 0, 100) / 100).toFixed(2) + ")";
+    // 关闭锐化时跳过 SVG 滤镜，保持默认显示路径轻量。
+    return filter + (normalizeAdjustment(values.sharpness, 0, 100) > 0 ? ' url("#imageSharpenFilter")' : "");
+  }
+
+  function getSharpenKernel(value) {
+    const amount = normalizeAdjustment(value, 0, 100) / 100;
+    const neighbor = amount === 0 ? 0 : -amount;
+    // 四邻域锐化核的权重和恒为 1，避免整体亮度随锐化强度改变。
+    return [0, neighbor, 0, neighbor, 1 + 4 * amount, neighbor, 0, neighbor, 0];
+  }
+
   function normalizeLabel(value) {
     return String(value === undefined || value === null ? "" : value).trim();
   }
@@ -263,6 +287,8 @@
   }
 
   return {
+    getImageAdjustmentFilter,
+    getSharpenKernel,
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     filterLabelOptions,

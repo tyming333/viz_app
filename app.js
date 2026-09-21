@@ -2,6 +2,8 @@
   "use strict";
 
   const {
+    getImageAdjustmentFilter,
+    getSharpenKernel,
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     filterLabelOptions,
@@ -24,9 +26,20 @@
     advanceBatchPreviewOffset
   } = window.ViewerCore;
 
+  // 所有参数只调整底图显示；默认值为原图，锐化/灰度 0 表示关闭。
+  // 亮度/对比度范围 0～600%，饱和度 0～200%，灰度/锐化 0～100%。
+  const imageAdjustmentControls = [
+    { name: "brightness", stateKey: "imageBrightness", defaultValue: 100, max: 600 },
+    { name: "contrast", stateKey: "imageContrast", defaultValue: 100, max: 600 },
+    { name: "saturation", stateKey: "imageSaturation", defaultValue: 100, max: 200 },
+    { name: "grayscale", stateKey: "imageGrayscale", defaultValue: 0, max: 100 },
+    { name: "sharpness", stateKey: "imageSharpness", defaultValue: 0, max: 100 }
+  ];
+
   const els = {
     prefixInput: document.getElementById("prefixInput"),
     jsonFileInput: document.getElementById("jsonFileInput"),
+    jsonFileNameText: document.getElementById("jsonFileNameText"),
     jsonInput: document.getElementById("jsonInput"),
     copyJsonBtn: document.getElementById("copyJsonBtn"),
     downloadJsonBtn: document.getElementById("downloadJsonBtn"),
@@ -76,12 +89,6 @@
     strokeWidthText: document.getElementById("strokeWidthText"),
     labelSizeRange: document.getElementById("labelSizeRange"),
     labelSizeText: document.getElementById("labelSizeText"),
-    brightnessRange: document.getElementById("brightnessRange"),
-    brightnessText: document.getElementById("brightnessText"),
-    resetBrightnessBtn: document.getElementById("resetBrightnessBtn"),
-    contrastRange: document.getElementById("contrastRange"),
-    contrastText: document.getElementById("contrastText"),
-    resetContrastBtn: document.getElementById("resetContrastBtn"),
     imageInfoIndex: document.getElementById("imageInfoIndex"),
     imageInfoSize: document.getElementById("imageInfoSize"),
     imageInfoObjects: document.getElementById("imageInfoObjects"),
@@ -140,6 +147,9 @@
     labelFontSize: 13,
     imageBrightness: 100,
     imageContrast: 100,
+    imageSaturation: 100,
+    imageGrayscale: 0,
+    imageSharpness: 0,
     viewFrame: 0,
     overlayFrame: 0,
     imageListScrollFrame: 0,
@@ -360,7 +370,7 @@
         button.type = "button";
         button.dataset[view.buttonDatasetKey] = String(i);
         button.textContent = view.getLabel(view.items[i], i);
-        button.title = button.textContent;
+        button.title = container === els.imageList ? String(view.items[i]) : button.textContent;
         if (i === view.selectedIndex) {
           button.classList.add("active");
         }
@@ -403,10 +413,11 @@
   }
 
   const imageListView = createVirtualList(els.imageList, 27, "imageIndex", function getImageLabel(item) {
-    return item;
+    // 只缩短显示文字，完整路径仍作为加载、筛选及导出的图片标识。
+    return String(item).replace(/\\/g, "/").split("/").pop();
   });
 
-  const objectListView = createVirtualList(els.objectList, 38, "objectIndex", function getObjectLabel(item, index) {
+  const objectListView = createVirtualList(els.objectList, 19, "objectIndex", function getObjectLabel(item, index) {
     return (index + 1) + ". " + item;
   });
 
@@ -416,6 +427,7 @@
 
   function setStatus(text, percent) {
     els.statusText.textContent = text;
+    els.statusText.hidden = !text;
     if (typeof percent === "number") {
       setProgress(percent);
     }
@@ -759,14 +771,6 @@
     return Math.max(0.1, Math.min(4, value));
   }
 
-  function clampBrightness(value) {
-    return Math.max(0, Math.min(600, value));
-  }
-
-  function clampContrast(value) {
-    return Math.max(0, Math.min(600, value));
-  }
-
   function getVisibleImageNames() {
     const filters = state.appliedFilters;
     const nameFilter = filters.image.trim().toLowerCase();
@@ -792,7 +796,9 @@
   }
 
   function updateKnownSizeText() {
-    els.knownSizeText.textContent = "宽高筛选基于已知图像尺寸 " + state.knownImageSizes.size + "/" + state.imageNames.length;
+    const count = state.knownImageSizes.size + "/" + state.imageNames.length;
+    els.knownSizeText.textContent = "尺寸已知 " + count;
+    els.knownSizeText.title = "宽高筛选基于已知图像尺寸 " + count;
   }
 
   function cancelImageSizeScan() {
@@ -1483,10 +1489,10 @@
     els.strokeWidthText.textContent = formatSliderValue(state.boxStrokeWidth);
     els.labelSizeRange.value = String(state.labelFontSize);
     els.labelSizeText.textContent = String(state.labelFontSize);
-    els.brightnessRange.value = String(state.imageBrightness);
-    els.brightnessText.textContent = Math.round(state.imageBrightness) + "%";
-    els.contrastRange.value = String(state.imageContrast);
-    els.contrastText.textContent = Math.round(state.imageContrast) + "%";
+    imageAdjustmentControls.forEach(function renderAdjustment(control) {
+      document.getElementById(control.name + "Range").value = String(state[control.stateKey]);
+      document.getElementById(control.name + "Text").textContent = Math.round(state[control.stateKey]) + "%";
+    });
   }
 
   function renderBoxVisibilityToggle() {
@@ -1961,7 +1967,7 @@
       els.mainImage.src = imageUrl(state.currentImage);
       els.mainImage.alt = state.currentImage;
       els.emptyState.style.display = "none";
-      setStatus("加载图片: " + state.currentImage, 72);
+      setStatus("", 72);
     } else {
       els.mainImage.removeAttribute("src");
       els.emptyState.style.display = "grid";
@@ -2217,9 +2223,12 @@
   }
 
   function applyImageAdjustments() {
-    els.mainImage.style.filter =
-      "brightness(" + (state.imageBrightness / 100).toFixed(2) + ") " +
-      "contrast(" + (state.imageContrast / 100).toFixed(2) + ")";
+    const settings = {};
+    imageAdjustmentControls.forEach(function collectAdjustment(control) {
+      settings[control.name] = state[control.stateKey];
+    });
+    document.getElementById("imageSharpenKernel").setAttribute("kernelMatrix", getSharpenKernel(settings.sharpness).join(" "));
+    els.mainImage.style.filter = getImageAdjustmentFilter(settings);
   }
 
   function applyZoom() {
@@ -2623,7 +2632,12 @@
     selectImage(name, { scrollList: true });
   });
   els.jsonFileInput.addEventListener("change", function onchange(event) {
-    readJsonFile(event.target.files[0]);
+    const file = event.target.files[0];
+    const name = file ? file.name : "未选择文件";
+    els.jsonFileNameText.textContent = name;
+    els.jsonFileNameText.title = name;
+    els.jsonFileInput.title = name;
+    readJsonFile(file);
   });
   els.applyFiltersBtn.addEventListener("click", applyFilters);
   els.clearFiltersBtn.addEventListener("click", clearFilters);
@@ -2725,7 +2739,7 @@
       preloadAdjacentImages();
       return;
     }
-    setStatus("图片已加载: " + state.currentImage, 100);
+    setStatus("", 100);
     renderAll();
     preloadAdjacentImages();
   });
@@ -2766,23 +2780,24 @@
     renderSliderValues();
     renderAnnotationOverlays();
   });
-  els.brightnessRange.addEventListener("input", function oninput(event) {
-    state.imageBrightness = clampBrightness(Number(event.target.value) || 100);
-    renderSliderValues();
-    applyImageAdjustments();
+  imageAdjustmentControls.forEach(function bindAdjustment(control) {
+    document.getElementById(control.name + "Range").addEventListener("input", function onAdjustment(event) {
+      const value = Number(event.target.value);
+      state[control.stateKey] = Number.isFinite(value) ? Math.max(0, Math.min(control.max, value)) : control.defaultValue;
+      renderSliderValues();
+      applyImageAdjustments();
+    });
+    const resetId = "reset" + control.name.charAt(0).toUpperCase() + control.name.slice(1) + "Btn";
+    document.getElementById(resetId).addEventListener("click", function resetAdjustment() {
+      state[control.stateKey] = control.defaultValue;
+      renderSliderValues();
+      applyImageAdjustments();
+    });
   });
-  els.resetBrightnessBtn.addEventListener("click", function onresetbrightness() {
-    state.imageBrightness = 100;
-    renderSliderValues();
-    applyImageAdjustments();
-  });
-  els.contrastRange.addEventListener("input", function oninput(event) {
-    state.imageContrast = clampContrast(Number(event.target.value) || 100);
-    renderSliderValues();
-    applyImageAdjustments();
-  });
-  els.resetContrastBtn.addEventListener("click", function onresetcontrast() {
-    state.imageContrast = 100;
+  document.getElementById("resetImageAdjustmentsBtn").addEventListener("click", function resetImageAdjustments() {
+    imageAdjustmentControls.forEach(function resetValue(control) {
+      state[control.stateKey] = control.defaultValue;
+    });
     renderSliderValues();
     applyImageAdjustments();
   });

@@ -11,6 +11,13 @@
     <script src="./app.js" defer></script>
   </head>
   <body data-app="viewer">
+    <svg class="image-filter-definitions" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="imageSharpenFilter" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feConvolveMatrix id="imageSharpenKernel" order="3" kernelMatrix="0 0 0 0 1 0 0 0 0" divisor="1" bias="0" edgeMode="duplicate" preserveAlpha="true" />
+        </filter>
+      </defs>
+    </svg>
     <header class="topbar">
       <div class="brand">
         <h1>
@@ -40,7 +47,11 @@
           </label>
           <label class="field">
             <span>导入 JSON 文件</span>
-            <input id="jsonFileInput" type="file" accept=".json,application/json" />
+            <div class="file-picker">
+              <input id="jsonFileInput" type="file" accept=".json,application/json" aria-label="导入 JSON 文件" />
+              <span class="file-picker-button" aria-hidden="true">选择文件</span>
+              <span id="jsonFileNameText" class="file-picker-name" title="未选择文件" aria-hidden="true">未选择文件</span>
+            </div>
           </label>
           <!-- 保留隐藏的数据载体，供文件导入、解析和导出流程使用；不在左侧显示 JSON 文本框。 -->
           <input id="jsonInput" type="hidden" />
@@ -101,7 +112,7 @@
               </label>
             </div>
               <div class="filter-note">
-                <span id="knownSizeText">宽高筛选基于已知图像尺寸 0/0</span>
+                <span id="knownSizeText" title="宽高筛选基于已知图像尺寸 0/0">尺寸已知 0/0</span>
                 <div class="filter-actions">
                   <button id="applyFiltersBtn" type="button">确定</button>
                   <button id="clearFiltersBtn" type="button">清空</button>
@@ -146,25 +157,39 @@
               <input id="labelSizeRange" type="range" min="8" max="28" step="1" value="13" />
               <output id="labelSizeText">13</output>
             </label>
-            <div class="toolbar-slider">
-              <button id="resetBrightnessBtn" class="toolbar-reset" type="button" title="复位亮度为 100%">亮度</button>
-              <input id="brightnessRange" type="range" min="0" max="600" step="5" value="100" aria-label="底图亮度" />
-              <output id="brightnessText">100%</output>
-            </div>
-            <div class="toolbar-slider">
-              <button id="resetContrastBtn" class="toolbar-reset" type="button" title="复位对比度为 100%">对比度</button>
-              <input id="contrastRange" type="range" min="0" max="600" step="5" value="100" aria-label="底图对比度" />
-              <output id="contrastText">100%</output>
-            </div>
           </div>
 
-          <div class="image-info" aria-live="polite">
-            <span>序号: <output id="imageInfoIndex">-</output></span>
-            <span>宽高: <output id="imageInfoSize">-</output></span>
-            <span>Objects: <output id="imageInfoObjects">0</output></span>
-            <span>缩放: <output id="imageInfoZoom">100%</output></span>
-            <span>创建时间: <output id="imageInfoCreated">无法读取</output></span>
+          <div class="image-adjustments" role="group" aria-label="图像调整">
+            <div class="adjustment-pair">
+              <div class="toolbar-slider">
+                <button id="resetBrightnessBtn" class="toolbar-reset" type="button" title="复位亮度为 100%">亮度</button>
+                <input id="brightnessRange" type="range" min="0" max="600" step="5" value="100" aria-label="底图亮度" />
+                <output id="brightnessText">100%</output>
+              </div>
+              <div class="toolbar-slider">
+                <button id="resetContrastBtn" class="toolbar-reset" type="button" title="复位对比度为 100%">对比度</button>
+                <input id="contrastRange" type="range" min="0" max="600" step="5" value="100" aria-label="底图对比度" />
+                <output id="contrastText">100%</output>
+              </div>
+            </div>
+            <div class="toolbar-slider">
+              <button id="resetSaturationBtn" class="toolbar-reset" type="button" title="复位饱和度为 100%">饱和度</button>
+              <input id="saturationRange" type="range" min="0" max="200" step="5" value="100" aria-label="底图饱和度" />
+              <output id="saturationText">100%</output>
+            </div>
+            <div class="toolbar-slider">
+              <button id="resetGrayscaleBtn" class="toolbar-reset" type="button" title="复位灰度为 0%">灰度</button>
+              <input id="grayscaleRange" type="range" min="0" max="100" step="5" value="0" aria-label="底图灰度" />
+              <output id="grayscaleText">0%</output>
+            </div>
+            <div class="toolbar-slider">
+              <button id="resetSharpnessBtn" class="toolbar-reset" type="button" title="关闭锐化；增强边缘仅供观察，可能放大噪声">锐化</button>
+              <input id="sharpnessRange" type="range" min="0" max="100" step="5" value="0" aria-label="底图锐化" />
+              <output id="sharpnessText">0%</output>
+            </div>
+            <button id="resetImageAdjustmentsBtn" type="button" title="恢复所有图像调整参数，不改变缩放和标注">全部复位</button>
           </div>
+
         </div>
 
         <div id="canvasShell" class="canvas-shell">
@@ -179,6 +204,13 @@
           </div>
           <button id="prevImageBtn" class="image-nav image-nav-prev" type="button" aria-label="上一张">&lsaquo;</button>
           <button id="nextImageBtn" class="image-nav image-nav-next" type="button" aria-label="下一张">&rsaquo;</button>
+          <div class="image-info" aria-live="polite" aria-label="当前图片信息">
+            <span>序号: <output id="imageInfoIndex">-</output></span>
+            <span>宽高: <output id="imageInfoSize">-</output></span>
+            <span>Objects: <output id="imageInfoObjects">0</output></span>
+            <span>缩放: <output id="imageInfoZoom">100%</output></span>
+            <span>创建时间: <output id="imageInfoCreated">-</output></span>
+          </div>
         </div>
       </section>
 

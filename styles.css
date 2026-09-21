@@ -37,6 +37,10 @@ select {
 }
 
 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.25;
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -55,6 +59,10 @@ button:disabled {
   opacity: 0.5;
 }
 
+button[hidden] {
+  display: none;
+}
+
 input,
 textarea,
 select {
@@ -69,7 +77,16 @@ select {
 input,
 select {
   height: 34px;
+  line-height: 1.25;
   padding: 0 10px;
+}
+
+/* 顶部应用选择框不沿用普通输入框的 34px 高度，避免越出顶栏。 */
+#appSwitcher {
+  height: 25px;
+  min-height: 25px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 textarea {
@@ -136,7 +153,7 @@ textarea {
 }
 
 .toolbar-actions button {
-  min-height: 28px;
+  min-height: 22px;
   padding: 0 8px;
   font-size: 12px;
 }
@@ -152,7 +169,7 @@ textarea {
 
 .batch-size-control input {
   width: 54px;
-  height: 28px;
+  height: 22px;
   padding: 0 4px 0 7px;
   font-size: 12px;
 }
@@ -169,8 +186,8 @@ textarea {
   height: calc(100vh - 29px);
   display: grid;
   grid-template-columns: minmax(220px, 250px) minmax(600px, 1fr) minmax(220px, 250px);
-  gap: 4px;
-  padding: 2px 4px 4px;
+  gap: 0;
+  padding: 0;
 }
 
 .sidebar,
@@ -432,6 +449,7 @@ textarea {
 }
 
 .label-multiselect-trigger {
+  justify-content: flex-start;
   position: relative;
   width: 100%;
   min-width: 0;
@@ -455,6 +473,12 @@ textarea {
   transform: translateY(-70%) rotate(45deg);
 }
 
+.label-multiselect-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .label-multiselect.is-open .label-multiselect-trigger::after {
   transform: translateY(-30%) rotate(225deg);
 }
@@ -476,6 +500,7 @@ textarea {
 
 .label-multiselect-option {
   display: flex;
+  justify-content: flex-start;
   width: 100%;
   min-height: 28px;
   align-items: center;
@@ -643,6 +668,9 @@ textarea {
 
 .virtual-row button {
   width: 100%;
+  /* 单行列表保留块级省略号；21px 行高使文字在 23px 边框内居中。 */
+  display: block;
+  line-height: 21px;
   min-height: 23px;
   height: 23px;
   font-size: 11px;
@@ -658,24 +686,63 @@ textarea {
   background: #e7f7f4;
 }
 
+/* 与 Objects 虚拟列表的 19px 步长一致，不影响左侧图片列表。 */
+#objectList .virtual-row {
+  height: 19px;
+}
+
+#objectList .virtual-row button {
+  height: 17px;
+  min-height: 17px;
+  line-height: 15px;
+}
+
 .viewer {
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .viewer-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
-  gap: 4px 6px;
-  padding: 4px 6px;
+  gap: 2px 6px;
+  padding: 2px 6px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: none;
+}
+
+.image-filter-definitions {
+  position: absolute;
+  pointer-events: none;
+}
+
+.image-adjustments {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+/* 亮度和对比度作为一组换行，不会被其他调整项拆开。 */
+.adjustment-pair {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.image-adjustments > button {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
 }
 
 .image-picker {
@@ -701,7 +768,7 @@ textarea {
 
 .image-picker input,
 .image-picker output {
-  height: 28px;
+  height: 22px;
   padding: 0 8px;
   font-size: 12px;
 }
@@ -722,13 +789,54 @@ textarea {
   gap: 6px;
   color: var(--muted);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .toolbar-slider input[type="range"] {
+  appearance: none;
   width: 82px;
   height: 18px;
   padding: 0;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  margin: 0;
+}
+
+/* 圆点缩小，输入区域保留 18px 高度，便于点击和键盘操作。 */
+.toolbar-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.toolbar-slider input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  margin-top: -3.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.toolbar-slider input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.toolbar-slider input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.toolbar-slider input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .toolbar-reset {
@@ -761,25 +869,34 @@ textarea {
 }
 
 .image-info {
-  grid-column: 2;
-  grid-row: 2;
-  justify-self: end;
-  min-height: 0;
+  /* 固定在画布视口而非图片上，盖住标注/批量网格，但鼠标事件穿透。 */
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 7;
+  pointer-events: none;
+  user-select: none;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 3px 10px;
-  max-width: 520px;
-  padding: 0;
-  color: var(--muted);
+  max-width: calc(100% - 16px);
+  padding: 4px 6px;
+  background: rgba(16, 20, 24, 0.65);
+  color: #e5e7eb;
+  text-shadow: 0 1px 2px #000;
   font-size: 10px;
-  line-height: 1.25;
-  text-align: right;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.image-info > span {
+  white-space: nowrap;
 }
 
 .image-info output {
-  color: var(--text);
+  color: #ffffff;
 }
 
 .canvas-shell {
@@ -789,9 +906,9 @@ textarea {
   overflow: hidden;
   cursor: grab;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   background: #101418;
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 
 .canvas-shell.is-object-target {
@@ -1111,15 +1228,278 @@ textarea {
   color: var(--danger);
 }
 
+/* 仅压缩两侧固定控件；虚拟列表行高与字号不变，剩余空间交给列表。 */
+.sidebar,
+.inspector {
+  gap: 0;
+}
+
+.sidebar .panel,
+.inspector .panel {
+  padding: 6px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.sidebar .panel + .panel,
+.inspector .panel + .panel {
+  border-top: 0;
+}
+
+.sidebar .virtual-list,
+.inspector .virtual-list {
+  border-radius: 0;
+}
+
+.sidebar .field,
+.inspector .field {
+  gap: 3px;
+  margin-bottom: 5px;
+}
+
+.sidebar .panel-title,
+.inspector .panel-title {
+  margin-bottom: 5px;
+}
+
+.inspector .panel-title span {
+  padding: 1px 5px;
+}
+
+.sidebar .import-panel input[type="text"] {
+  height: 24px;
+  min-width: 0;
+  padding: 0 6px;
+}
+
+.sidebar .file-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  min-width: 0;
+  padding: 1px 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfe;
+}
+
+/* 保留原生选择、键盘与文件导入，文字由独立 flex 层显示，避免系统按钮裁切。 */
+.sidebar .file-picker input[type="file"] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sidebar .file-picker:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.sidebar .file-picker-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.sidebar .file-picker:hover .file-picker-button {
+  border-color: var(--accent);
+}
+
+.sidebar .file-picker-name {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 22px;
+  color: var(--text);
+}
+
+.sidebar .progress {
+  margin: 5px 0;
+}
+
+.sidebar .status {
+  overflow-wrap: anywhere;
+}
+
+.sidebar .filter-stack {
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.sidebar .filter-text-row,
+.sidebar .filter-range-grid,
+.sidebar .range-inputs,
+.sidebar .filter-note,
+.sidebar .filter-actions {
+  gap: 4px;
+}
+
+.sidebar .range-field {
+  gap: 2px;
+}
+
+.sidebar .filter-text-row > input,
+.sidebar .label-multiselect-trigger,
+.sidebar .range-inputs input {
+  height: 22px;
+  min-height: 22px;
+  padding-left: 5px;
+}
+
+.sidebar .label-filter-field {
+  height: 22px;
+  padding: 0 4px;
+}
+
+.sidebar .label-filter-field input {
+  height: 20px;
+}
+
+.sidebar .label-filter-chip {
+  height: 18px;
+}
+
+.sidebar .filter-note button {
+  min-height: 22px;
+  padding: 0 5px;
+}
+
+.sidebar .filter-note {
+  min-width: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.sidebar #knownSizeText {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar .batch-progress-panel {
+  margin-bottom: 4px;
+  padding: 4px;
+}
+
+.sidebar .batch-progress-title {
+  margin-bottom: 2px;
+}
+
+.inspector .list-panel > .row {
+  gap: 3px;
+  flex-wrap: nowrap;
+  margin-bottom: 4px;
+}
+
+.inspector .list-panel > .row button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 22px;
+  min-height: 22px;
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+
+/* 编辑内容增多或窗口变矮时内部滚动，避免挤没 Objects 列表。 */
+.inspector .editor-panel {
+  min-height: 0;
+  max-height: calc(100% - 180px);
+  overflow-y: auto;
+}
+
+.inspector .bbox-summary {
+  margin: 0 0 5px;
+  padding: 2px 5px;
+}
+
+.inspector #labelsEditor {
+  height: 60px;
+  min-height: 60px;
+  padding: 5px 6px;
+}
+
+.inspector .bbox-grid {
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.inspector .bbox-grid label {
+  gap: 3px;
+}
+
+.inspector .bbox-grid input {
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+}
+
+.inspector .keypoint-editor {
+  margin-bottom: 5px;
+}
+
+.inspector .keypoint-editor-title {
+  margin-bottom: 3px;
+}
+
+.inspector .keypoint-editor-title button {
+  min-height: 22px;
+  padding: 0 5px;
+}
+
+.inspector .keypoint-list {
+  gap: 3px;
+}
+
+.inspector .keypoint-empty {
+  padding: 3px 5px;
+}
+
+.inspector .keypoint-row {
+  grid-template-columns: minmax(0, 1fr) minmax(50px, 0.7fr) minmax(50px, 0.7fr) 24px;
+  gap: 3px;
+}
+
+.inspector .keypoint-row input,
+.inspector .keypoint-row button {
+  height: 24px;
+  min-height: 24px;
+}
+
+.inspector .keypoint-row button {
+  width: 24px;
+}
+
+.inspector #applyObjectBtn {
+  min-height: 24px;
+  padding: 0 8px;
+}
+
 @media (max-width: 1180px) {
   .viewer-toolbar {
     grid-template-columns: 1fr;
-  }
-
-  .image-info {
-    grid-column: 1;
-    grid-row: auto;
-    max-width: 100%;
   }
 
   .layout {
@@ -1153,10 +1533,6 @@ textarea {
 
   .actions button {
     flex: 0 0 auto;
-  }
-
-  .layout {
-    padding: 2px 4px 4px;
   }
 
   .image-picker {
