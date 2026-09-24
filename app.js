@@ -80,6 +80,7 @@
     batchGridSizeInput: document.getElementById("batchGridSizeInput"),
     batchPreviewBtn: document.getElementById("batchPreviewBtn"),
     resetViewBtn: document.getElementById("resetViewBtn"),
+    editModeBtn: document.getElementById("editModeBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
     showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
@@ -138,6 +139,7 @@
     drag: null,
     pan: null,
     pendingKeypointPlacement: null,
+    editMode: false,
     showBoxes: true,
     showAllOverlayObjects: false,
     showBoxFill: true,
@@ -221,6 +223,7 @@
   }
 
   function undoLastChange() {
+    if (!state.editMode) return false;
     const previous = state.undoHistory.pop();
     if (!previous) {
       setStatus("没有可撤销的操作", 0);
@@ -1369,12 +1372,18 @@
 
   function renderEditor() {
     const obj = currentObject();
+    const editable = state.editMode && !!obj;
+    els.editModeBtn.classList.toggle("active", state.editMode);
+    els.editModeBtn.setAttribute("aria-pressed", String(state.editMode));
+    els.editModeBtn.title = state.editMode ? "关闭标注编辑" : "开启标注编辑";
+    els.addRectangleBtn.disabled = !state.editMode || !state.currentImage;
+    els.addQuadrilateralBtn.disabled = !state.editMode || !state.currentImage;
     els.selectedBadge.textContent = obj ? "#" + (state.selectedObjectIndex + 1) : "未选中";
     els.bboxSizeText.textContent = obj ? formatBboxSize(obj.bbox) : "未选中";
-    els.labelsEditor.disabled = !obj;
-    els.applyObjectBtn.disabled = !obj;
-    els.deleteObjectBtn.disabled = !obj;
-    els.addKeypointBtn.disabled = !obj;
+    els.labelsEditor.disabled = !editable;
+    els.applyObjectBtn.disabled = !editable;
+    els.deleteObjectBtn.disabled = !editable;
+    els.addKeypointBtn.disabled = !editable;
     els.labelsEditor.value = obj ? (obj.labels || []).join("\n") : "";
     renderKeypointPlacementButton();
 
@@ -1387,7 +1396,7 @@
       input.type = "number";
       input.step = "1";
       input.value = obj ? String(obj.bbox[index]) : "";
-      input.disabled = !obj;
+      input.disabled = !editable;
       input.dataset.coordIndex = String(index);
       input.addEventListener("change", applyEditor);
       label.appendChild(span);
@@ -1437,6 +1446,9 @@
       deleteBtn.title = "删除关键点";
       deleteBtn.setAttribute("aria-label", "删除关键点");
       deleteBtn.dataset.keypointAction = "delete";
+      [nameInput, xInput, yInput, deleteBtn].forEach(function lockControl(control) {
+        control.disabled = !state.editMode;
+      });
 
       row.append(nameInput, xInput, yInput, deleteBtn);
       fragment.appendChild(row);
@@ -1659,7 +1671,7 @@
   }
 
   function updateObjectPointerCursor(event) {
-    if (state.batchPreview || !state.currentImage || state.drag || state.pan || isKeypointPlacementPending()) {
+    if (!state.editMode || state.batchPreview || !state.currentImage || state.drag || state.pan || isKeypointPlacementPending()) {
       els.canvasShell.classList.remove("is-object-target");
       setHoverTarget({ kind: "none", index: -1 });
       return;
@@ -1839,7 +1851,7 @@
         }
       }
     });
-    if (state.showBoxes) {
+    if (state.editMode && state.showBoxes) {
       drawHandles();
     }
   }
@@ -2051,6 +2063,7 @@
   }
 
   function applyEditor() {
+    if (!state.editMode) return;
     const obj = currentObject();
     if (!obj) return;
     const inputs = Array.from(els.bboxGrid.querySelectorAll("input"));
@@ -2079,6 +2092,7 @@
   }
 
   function applyKeypointEditor() {
+    if (!state.editMode) return;
     const obj = currentObject();
     if (!obj) return;
     const keypoints = ensureObjectKeypoints(obj);
@@ -2111,6 +2125,7 @@
   }
 
   function addKeypoint() {
+    if (!state.editMode) return;
     const obj = currentObject();
     if (!obj) return;
     if (isKeypointPlacementPending()) {
@@ -2128,6 +2143,7 @@
   }
 
   function placePendingKeypoint(imageX, imageY) {
+    if (!state.editMode) return false;
     const request = state.pendingKeypointPlacement;
     if (!request) return false;
     if (request.image !== state.currentImage || request.objectIndex !== state.selectedObjectIndex) {
@@ -2167,6 +2183,7 @@
   }
 
   function deleteKeypoint(pointIndex) {
+    if (!state.editMode) return;
     const obj = currentObject();
     if (!obj || !obj.keypoints || !Array.isArray(obj.keypoints.points)) return;
     if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= obj.keypoints.points.length) return;
@@ -2180,6 +2197,7 @@
   }
 
   function addObject(boxType) {
+    if (!state.editMode) return;
     if (!state.currentImage || !state.data) return;
     const width = els.mainImage.naturalWidth || 200;
     const height = els.mainImage.naturalHeight || 160;
@@ -2204,6 +2222,7 @@
   }
 
   function deleteObject() {
+    if (!state.editMode) return;
     const objects = currentObjects();
     if (state.selectedObjectIndex < 0 || state.selectedObjectIndex >= objects.length) return;
     recordUndoSnapshot();
@@ -2292,7 +2311,7 @@
       return;
     }
     const coords = getImageCoordsFromClient(event.clientX, event.clientY);
-    const keypointIndex = state.showKeypoints ? findKeypointHit(coords.x, coords.y) : -1;
+    const keypointIndex = state.editMode && state.showKeypoints ? findKeypointHit(coords.x, coords.y) : -1;
     if (keypointIndex >= 0) {
       event.preventDefault();
       recordUndoSnapshot();
@@ -2300,7 +2319,7 @@
       els.canvasShell.setPointerCapture(event.pointerId);
       return;
     }
-    const handleIndex = findHandleHit(coords.x, coords.y);
+    const handleIndex = state.editMode && state.showBoxes ? findHandleHit(coords.x, coords.y) : -1;
     if (handleIndex >= 0) {
       event.preventDefault();
       recordUndoSnapshot();
@@ -2309,7 +2328,7 @@
       return;
     }
 
-    const edgeIndex = findRectangleEdgeHit(coords.x, coords.y);
+    const edgeIndex = state.editMode && state.showBoxes ? findRectangleEdgeHit(coords.x, coords.y) : -1;
     if (edgeIndex >= 0) {
       event.preventDefault();
       recordUndoSnapshot();
@@ -2318,7 +2337,7 @@
       return;
     }
 
-    const hitIndex = pickObjectAtPoint(coords.x, coords.y);
+    const hitIndex = state.editMode ? pickObjectAtPoint(coords.x, coords.y) : -1;
     if (hitIndex >= 0) {
       event.preventDefault();
       if (hitIndex !== state.selectedObjectIndex) {
@@ -2353,7 +2372,7 @@
 
   function movePan(event) {
     if (!state.drag && !state.pan) updateObjectPointerCursor(event);
-    if (state.drag) {
+    if (state.editMode && state.drag) {
       const obj = currentObjects()[state.drag.objectIndex];
       if (!obj) return;
       const coords = getImageCoordsFromClient(event.clientX, event.clientY);
@@ -2459,6 +2478,17 @@
     link.click();
     URL.revokeObjectURL(link.href);
     setStatus("已导出 JSON", 100);
+  }
+
+  function toggleEditMode() {
+    endPan();
+    state.editMode = !state.editMode;
+    state.pendingKeypointPlacement = null;
+    els.canvasShell.classList.remove("is-object-target");
+    setHoverTarget({ kind: "none", index: -1 });
+    renderEditor();
+    renderOverlay();
+    setStatus(state.editMode ? "已开启标注编辑" : "已关闭标注编辑", 100);
   }
 
   function toggleImageExportSelection(name, checked) {
@@ -2749,6 +2779,7 @@
     setStatus("图片加载失败，请检查 prefix: " + state.currentImage, 0);
   });
   els.resetViewBtn.addEventListener("click", resetView);
+  els.editModeBtn.addEventListener("click", toggleEditMode);
   els.boxVisibilityBtn.addEventListener("click", function onbox() {
     state.showBoxes = !state.showBoxes;
     renderBoxVisibilityToggle();
@@ -2849,14 +2880,14 @@
     }
     if (shouldIgnoreImageShortcut(event)) return;
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
-      if (state.undoHistory.size() > 0) {
+      if (state.editMode && state.undoHistory.size() > 0) {
         event.preventDefault();
         undoLastChange();
       }
       return;
     }
     if (event.key === "Delete") {
-      if (currentObject()) {
+      if (state.editMode && currentObject()) {
         event.preventDefault();
         deleteObject();
       }
