@@ -1,0 +1,669 @@
+{
+  "camera_config": [{ "train_id": "all", "camera_num": "01,02,21,22" }],
+  "line_name": ["all", "all"],
+  "model_route": [
+    {
+      "last_output": "root",
+      "lable_name": "Null",
+      "current_model": "dw_ls_1.onnx",
+      "code": "",
+      "num": "10",
+      "confidence": "",
+      "non_defect": "false",
+      "childlist": [
+        {
+          "last_output": "0",
+          "lable_name": "安装底座",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "101001001003", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "101001001007", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "101001001004", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "101001001002", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "1",
+          "lable_name": "悬吊角钢",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "101004001007", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "101004001010", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "101004001008", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "101004001006", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "2",
+          "lable_name": "吊柱底座",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "101003002004", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "101003002007", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "101003002005", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "101003002003", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "3",
+          "lable_name": "地线线夹底座",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "5",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "104002003009", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "104002003012", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "104002003010", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "104002003008", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "6", "lable_name": "Null", "current_model": "", "code": "104002003013", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "4",
+          "lable_name": "地线线夹",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "2",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "104002004005", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "104002004007", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "104002004004", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "104002004002", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "6", "lable_name": "Null", "current_model": "", "code": "104002004008", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "5",
+          "lable_name": "槽道底座",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "101004001017", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "101004001014", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "101004001018", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "101004001016", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "6",
+          "lable_name": "中心锚结底座",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(30,30)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "103002003003", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "103002003012", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "103002003013", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "103002003002", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "last_output": "7",
+          "lable_name": "中心锚结底座",
+          "current_model": "dw_ls_2.onnx",
+          "code": "",
+          "num": "1",
+          "confidence": "0.5",
+          "non_defect": "false",
+          "childlist": [
+            {
+              "last_output": "1",
+              "lable_name": "Null",
+              "current_model": "pretreat:check_gray(30,0)",
+              "code": "",
+              "num": "1",
+              "confidence": "0.5",
+              "non_defect": "false",
+              "childlist": [
+                {
+                  "last_output": "0",
+                  "lable_name": "Null",
+                  "current_model": "pretreat:check_gray(220,1)",
+                  "code": "",
+                  "num": "1",
+                  "confidence": "0.5",
+                  "non_defect": "false",
+                  "childlist": [
+                    {
+                      "last_output": "0",
+                      "lable_name": "Null",
+                      "current_model": "pretreat:check_w_h(40,40)",
+                      "code": "",
+                      "num": "1",
+                      "confidence": "0.5",
+                      "non_defect": "false",
+                      "childlist": [
+                        {
+                          "last_output": "0",
+                          "lable_name": "Null",
+                          "current_model": "pretreat:scale_pic(-0.2,-0.2,1.4,1.4,0,0,0,0)",
+                          "code": "",
+                          "num": "1",
+                          "confidence": "0.5",
+                          "non_defect": "false",
+                          "childlist": [
+                            {
+                              "last_output": "0",
+                              "lable_name": "Null",
+                              "current_model": "pretreat:check_Laplacian(15)",
+                              "code": "",
+                              "num": "1",
+                              "confidence": "0.5",
+                              "non_defect": "false",
+                              "childlist": [
+                                {
+                                  "last_output": "0",
+                                  "lable_name": "Null",
+                                  "current_model": "ib_res_lm10fl.onnx",
+                                  "code": "",
+                                  "num": "4",
+                                  "confidence": "0.8",
+                                  "non_defect": "false",
+                                  "childlist": [
+                                    { "last_output": "0", "lable_name": "Null", "current_model": "", "code": "102001005005", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "1", "lable_name": "Null", "current_model": "", "code": "102001005007", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "3", "lable_name": "Null", "current_model": "", "code": "102001005006", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] },
+                                    { "last_output": "4", "lable_name": "Null", "current_model": "", "code": "102001005004", "num": "0", "confidence": "0.8", "non_defect": "false", "childlist": [] }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        { "last_output": "1", "lable_name": "悬吊角钢", "current_model": "pretreat:scale_pic(-0.1,-0.1,0.8,0.4,0,0,0,0)", "code": "", "num": "1", "confidence": "0.5", "non_defect": "false", "childlist": [{ "last_output": "0", "lable_name": "Null", "current_model": "dw_cgps_2.onnx", "code": "", "num": "1", "confidence": "0.5", "non_defect": "false", "childlist": [{ "last_output": "0", "lable_name": "Null", "current_model": "pretreat:scale_pic(0,0,0,0,0,0,0,0)", "code": "", "num": "1", "confidence": "0.5", "non_defect": "false", "childlist": [{ "last_output": "0", "lable_name": "Null", "current_model": "", "code": "101004001012", "num": "0", "confidence": "0.5", "non_defect": "false", "childlist": [] }] }] }] },
+        { "last_output": "5", "lable_name": "槽道底座", "current_model": "dw_cdtl_2.onnx", "code": "", "num": "1", "confidence": "0.5", "non_defect": "false", "childlist": [{ "last_output": "0", "lable_name": "Null", "current_model": "", "code": "101004001013", "num": "0", "confidence": "0.7", "non_defect": "false", "childlist": [] }] }
+      ]
+    }
+  ]
+}

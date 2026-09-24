@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>模型配置</title>
+  <link rel="stylesheet" href="../shared/app-switcher.css" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="../shared/app-switcher.js" defer></script>
+  <script src="./core.js" defer></script>
+  <script src="./graph.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body data-app="model-config">
+  <header class="topbar">
+    <div class="brand"><label class="app-switcher"><span class="sr-only">应用</span><select id="appSwitcher" aria-label="选择应用"><option value="viewer">数据可视化工具</option><option value="field-defect">现场缺陷展示</option><option value="model-config">模型配置</option></select></label><span class="brand-divider"></span><span class="muted">配置编辑器</span></div>
+    <div class="toolbar"><button id="openBtn">打开配置</button><input id="fileInput" type="file" accept=".json,application/json" hidden /><button id="undoBtn" disabled title="撤销（最多 100 步）">撤销</button><button id="redoBtn" disabled>重做</button><button id="saveBtn" class="primary" disabled>另存为新文件</button></div>
+  </header>
+  <div id="status" class="status" role="status" aria-live="polite">打开配置文件，开始编辑本地副本。</div>
+  <main id="welcome" class="welcome">
+    <div class="welcome-icon" aria-hidden="true">{ }</div><p class="eyebrow">MODEL CONFIGURATION</p><h1>让每一条模型路径清晰可见</h1><p>相机、线路与模型路由，在一个独立工作区内查看和编辑。</p><button id="welcomeOpenBtn" class="primary">选择配置 JSON</button>
+    <div class="welcome-features"><div><strong>递归节点树</strong><span>逐层查看父节点、子节点和叶节点</span></div><div><strong>横向编辑</strong><span>每个节点的字段直接显示、直接修改</span></div><div><strong>详细配置</strong><span>按需查看全局配置、JSON 和修改对照</span></div></div>
+    <p class="welcome-note">支持 UTF-8 / UTF-16，保留原 BOM 状态。安全另存需使用支持目录选择的 Edge / Chrome。</p>
+  </main>
+  <main id="graphWorkspace" class="graph-workspace" hidden>
+    <div class="graph-toolbar">
+      <div class="graph-file"><strong id="graphFileName"></strong><span id="graphDirty" class="badge"></span><span id="graphSummary" class="muted"></span></div>
+      <div class="toolbar"><input id="graphSearch" type="search" aria-label="搜索树节点" placeholder="查找模型、编码、参数…" /><button id="graphOverviewBtn">相机 / 线路</button><button id="detailsBtn">详细配置</button></div>
+    </div>
+    <div class="graph-strip"><div class="toolbar"><span class="eyebrow">递归节点树</span><span class="flow-direction">字段直接编辑 · 子树按需展开</span><span id="clipboardStatus" class="muted">删除仅移除本节点，子节点顺次上提</span><span id="dragHint" class="drag-hint" hidden></span></div><div class="toolbar"><button id="graphAddRoot" title="新增根节点；拖动节点到此处可移至根节点列表末尾">＋ 根节点</button><button id="pasteRootBtn" disabled>粘贴到根列表</button><button id="branchOverviewBtn">分支概览</button><button id="graphExpand">全部展开</button><button id="graphCollapse">全部收起</button></div></div>
+    <div id="graphViewport" class="graph-viewport" tabindex="0" aria-label="递归节点树">
+      <div id="graphTable" class="graph-table">
+        <div id="graphTableHeader" class="graph-table-header" aria-label="节点字段列名"></div>
+        <div id="graphNodes" aria-label="模型路由层级"></div>
+      </div>
+      <p id="graphEmpty" class="graph-empty" hidden>尚无路由节点，点击“＋ 根节点”开始。</p>
+    </div>
+    <footer class="graph-footer"><div class="graph-legend"><span><i class="dot model"></i>模型</span><span><i class="dot pretreat"></i>预处理</span><span><i class="dot result"></i>结果</span><span id="graphVisible" class="muted"></span></div><div class="toolbar"><span class="muted">复制仅本节点 · 删除保留子节点 · 层级移动携带后代</span><button id="locateNode">定位选中</button></div></footer>
+  </main>
+  <dialog id="placementDialog" class="placement-dialog"><form id="placementForm"><div class="section-title"><h2 id="placementTitle">插入已复制节点</h2><button id="closePlacementBtn" type="button" aria-label="关闭">×</button></div><p id="placementSource" class="muted"></p><label class="field">目标节点<select id="placementTarget"></select></label><label class="field">插入方式<select id="placementPosition"></select></label><p id="placementError" class="error" role="alert"></p><div class="dialog-actions"><button id="cancelPlacementBtn" type="button">取消</button><button id="confirmPlacementBtn" class="primary" type="submit">执行</button></div></form></dialog>
+  <dialog id="detailsDialog" class="details-dialog" aria-labelledby="detailsHeading">
+    <div class="details-topbar"><h2 id="detailsHeading">详细配置</h2><span class="muted">完整参数 · 全局设置 · JSON · 修改对照</span><div class="toolbar"><button id="detailUndoBtn">撤销</button><button id="detailRedoBtn">重做</button><button id="detailSaveBtn" class="primary">另存为新文件</button><button id="closeDetailsBtn">返回节点树 ×</button></div></div>
+  <div id="workspace" class="workspace" hidden>
+    <aside class="rail">
+      <div class="file-card"><div class="eyebrow">当前配置</div><h1 id="fileName"></h1><div class="file-state"><span id="dirtyBadge" class="badge">未修改</span><span id="fileFormat" class="muted"></span></div></div>
+      <button id="overviewBtn" class="overview-link">配置概览 <span>相机 · 线路</span></button>
+      <div class="rail-heading"><h2>模型路由</h2><span id="routeCount" class="badge"></span></div>
+      <div class="search-box"><input id="searchInput" type="search" placeholder="搜索模型、编码或参数…" aria-label="搜索路由" /></div>
+      <div class="tree-controls"><button id="expandBtn">全部展开</button><button id="collapseBtn">收起</button><button id="addRootBtn" title="新增根路由">＋ 根节点</button></div>
+      <div id="routeTree" class="route-tree" aria-label="模型路由列表"></div>
+      <div class="legend"><span><i class="dot model"></i>模型</span><span><i class="dot pretreat"></i>预处理</span><span><i class="dot result"></i>结果</span></div>
+    </aside>
+    <section class="main-panel">
+      <div class="workspace-heading"><div><div id="breadcrumb" class="eyebrow">配置工作区</div><h2 id="selectionTitle">配置概览</h2></div><span id="nodeKind" class="badge"></span></div>
+      <div class="tabs" role="tablist" aria-label="编辑视图"><button id="formTab" role="tab" aria-selected="true" aria-controls="formView">参数编辑</button><button id="jsonTab" role="tab" aria-selected="false" aria-controls="jsonView">完整 JSON</button><button id="changesTab" role="tab" aria-selected="false" aria-controls="changesView">修改对照 <span id="changeCount">0</span></button></div>
+      <div class="view-scroll">
+        <section id="formView" role="tabpanel" aria-labelledby="formTab"></section>
+        <section id="jsonView" role="tabpanel" aria-labelledby="jsonTab" hidden><div class="section-title"><div><h3>完整配置 JSON</h3><p>应用后同步到参数和路由树；保留源编码及换行方式。</p></div><div class="toolbar"><button id="discardJsonBtn">放弃文本修改</button><button id="applyJsonBtn" class="primary">应用 JSON</button></div></div><label class="sr-only" for="jsonEditor">完整配置 JSON</label><textarea id="jsonEditor" class="json-editor" spellcheck="false"></textarea><p id="jsonError" class="error" role="alert"></p></section>
+        <section id="changesView" role="tabpanel" aria-labelledby="changesTab" hidden></section>
+      </div>
+    </section>
+    <aside class="inspector"><section><div class="eyebrow">配置总览</div><div id="stats" class="stats"></div></section><section><h3>文件信息</h3><dl id="fileDetails" class="details"></dl></section><section><div class="section-title"><h3>配置检查</h3><span id="validationBadge" class="badge"></span></div><div id="validation"></div></section><section class="save-note"><h3>副本编辑</h3><p>编辑只发生在内存中。另存时选择目标目录，创建新名称的文件；已有文件不会被覆盖。</p><p>原字段类型、编码及 BOM 状态保留。</p></section></aside>
+  </div>
+  </dialog>
+  <dialog id="saveDialog"><form id="saveForm"><div class="section-title"><h2>另存为新文件</h2><button id="closeSaveBtn" type="button" aria-label="关闭">×</button></div><p>选择目录后创建新文件。不能使用源文件名，也不能覆盖目录中的已有文件。</p><label class="field">新文件名<input id="saveName" required autocomplete="off" /></label><p id="saveEncoding" class="muted"></p><p id="saveError" class="error" role="alert"></p><div class="dialog-actions"><button id="cancelSaveBtn" type="button">取消</button><button id="confirmSaveBtn" class="primary" type="submit">选择目录并保存</button></div></form></dialog>
+</body>
+</html>

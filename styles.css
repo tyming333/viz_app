@@ -1,4 +1,8 @@
 :root {
+  /* 标题 14px、正文/控件 12px、提示/计数 11px；不控制画布标注字号。 */
+  --font-title: 14px;
+  --font-body: 12px;
+  --font-meta: 11px;
   --bg: #f5f6f8;
   --surface: #ffffff;
   --surface-2: #eef2f6;
@@ -26,6 +30,8 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
+  font-size: var(--font-body);
+  line-height: 1.4;
   letter-spacing: 0;
 }
 
@@ -83,6 +89,8 @@ select {
 
 /* 顶部应用选择框不沿用普通输入框的 34px 高度，避免越出顶栏。 */
 #appSwitcher {
+  font-size: var(--font-title);
+  font-weight: 600;
   height: 25px;
   min-height: 25px;
   padding-top: 0;
@@ -94,8 +102,7 @@ textarea {
   resize: vertical;
   padding: 10px;
   line-height: 1.45;
-  font-family: Consolas, "Courier New", monospace;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .topbar {
@@ -110,8 +117,9 @@ textarea {
 }
 
 .brand h1 {
+  font-weight: 600;
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-title);
   line-height: 1;
 }
 
@@ -129,7 +137,7 @@ textarea {
 
 .version-label {
   color: var(--muted);
-  font-size: 9px;
+  font-size: var(--font-meta);
   font-weight: 400;
   margin-left: 6px;
 }
@@ -145,7 +153,7 @@ textarea {
 .actions button {
   min-height: 22px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .toolbar-actions {
@@ -155,7 +163,7 @@ textarea {
 .toolbar-actions button {
   min-height: 22px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .batch-size-control {
@@ -163,7 +171,7 @@ textarea {
   align-items: center;
   gap: 5px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-body);
   white-space: nowrap;
 }
 
@@ -171,7 +179,7 @@ textarea {
   width: 54px;
   height: 22px;
   padding: 0 4px 0 7px;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .actions button:last-child,
@@ -238,7 +246,7 @@ textarea {
 
 .field span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .field.fill {
@@ -254,6 +262,12 @@ textarea {
   margin-bottom: 10px;
 }
 
+.panel-title strong,
+.empty-state strong {
+  font-size: var(--font-title);
+  font-weight: 600;
+}
+
 .panel-title span,
 #selectedBadge,
 #imageCount,
@@ -264,7 +278,7 @@ textarea {
   background: var(--surface-2);
   color: var(--muted);
   padding: 3px 8px;
-  font-size: 12px;
+  font-size: var(--font-meta);
 }
 
 .progress {
@@ -297,7 +311,7 @@ textarea {
   gap: 8px;
   margin-bottom: 5px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-meta);
 }
 
 .batch-progress-title output {
@@ -317,7 +331,7 @@ textarea {
   min-height: 18px;
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-meta);
 }
 
 .filter-stack {
@@ -341,7 +355,7 @@ textarea {
   flex: 1;
   height: 27px;
   padding: 0 7px;
-  font-size: 11px;
+  font-size: var(--font-body);
 }
 
 .label-filter-combobox {
@@ -377,7 +391,7 @@ textarea {
   border: 0;
   background: transparent;
   padding: 0 2px;
-  font-size: 11px;
+  font-size: var(--font-body);
 }
 
 .label-filter-selections {
@@ -396,7 +410,7 @@ textarea {
   background: #dbeafe;
   color: #1d4ed8;
   padding: 0 4px;
-  font-size: 10px;
+  font-size: var(--font-body);
 }
 
 .label-filter-chip-text {
@@ -408,7 +422,7 @@ textarea {
 
 .label-filter-chip-remove {
   flex: 0 0 auto;
-  font-size: 13px;
+  font-size: var(--font-body);
   line-height: 1;
 }
 
@@ -425,7 +439,7 @@ textarea {
 .label-filter-empty {
   padding: 7px 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-meta);
 }
 
 .filter-stack > input,
@@ -434,7 +448,7 @@ textarea {
 .range-inputs input {
   height: 27px;
   padding: 0 7px;
-  font-size: 11px;
+  font-size: var(--font-body);
 }
 
 .filter-stack > select {
@@ -564,13 +578,13 @@ textarea {
 .filter-note #imageCount {
   min-width: 0;
   padding: 1px 4px;
-  font-size: 10px;
+  font-size: var(--font-meta);
 }
 
 .filter-actions button {
   min-height: 26px;
   padding: 0 4px;
-  font-size: 11px;
+  font-size: var(--font-body);
 }
 
 .filter-range-grid {
@@ -589,7 +603,7 @@ textarea {
 .range-field span,
 .filter-note {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-meta);
 }
 
 .range-inputs {
@@ -616,7 +630,7 @@ textarea {
 .filter-note button {
   min-height: 26px;
   padding: 0 8px;
-  font-size: 11px;
+  font-size: var(--font-body);
   flex: 0 0 auto;
 }
 
@@ -673,7 +687,7 @@ textarea {
   line-height: 21px;
   min-height: 23px;
   height: 23px;
-  font-size: 11px;
+  font-size: var(--font-body);
   border-color: color-mix(in srgb, var(--line) 45%, transparent);
   text-align: left;
   overflow: hidden;
@@ -742,7 +756,7 @@ textarea {
 .image-adjustments > button {
   min-height: 20px;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--font-body);
 }
 
 .image-picker {
@@ -756,7 +770,7 @@ textarea {
 
 .image-picker span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-meta);
 }
 
 .image-picker-controls {
@@ -770,7 +784,7 @@ textarea {
 .image-picker output {
   height: 22px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .image-picker output {
@@ -788,7 +802,7 @@ textarea {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-body);
   white-space: nowrap;
 }
 
@@ -860,7 +874,7 @@ textarea {
   min-width: 30px;
   text-align: center;
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--font-meta);
 }
 
 .toolbar-actions button.active {
@@ -886,7 +900,7 @@ textarea {
   background: rgba(16, 20, 24, 0.65);
   color: #e5e7eb;
   text-shadow: 0 1px 2px #000;
-  font-size: 10px;
+  font-size: var(--font-meta);
   line-height: 1.4;
   text-align: left;
 }
@@ -1022,7 +1036,7 @@ textarea {
   padding: 3px 5px;
   background: rgba(8, 11, 14, 0.78);
   color: #ffffff;
-  font-size: 10px;
+  font-size: var(--font-meta);
   line-height: 1.2;
   pointer-events: none;
 }
@@ -1059,7 +1073,7 @@ textarea {
   display: grid;
   place-content: center;
   color: #fca5a5;
-  font-size: 11px;
+  font-size: var(--font-meta);
   content: "加载失败";
 }
 
@@ -1121,7 +1135,7 @@ textarea {
 
 .empty-state span {
   color: #9aa7b5;
-  font-size: 13px;
+  font-size: var(--font-body);
 }
 
 .bbox-summary {
@@ -1134,7 +1148,7 @@ textarea {
   border-radius: 6px;
   background: var(--surface-2);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .bbox-summary output {
@@ -1155,7 +1169,7 @@ textarea {
   align-items: center;
   gap: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .bbox-grid input {
@@ -1174,13 +1188,13 @@ textarea {
   gap: 8px;
   margin-bottom: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .keypoint-editor-title button {
   min-height: 26px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--font-body);
 }
 
 .keypoint-list {
@@ -1196,7 +1210,7 @@ textarea {
   border: 1px dashed var(--line);
   border-radius: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-meta);
 }
 
 .keypoint-row {
@@ -1228,7 +1242,7 @@ textarea {
   color: var(--danger);
 }
 
-/* 仅压缩两侧固定控件；虚拟列表行高与字号不变，剩余空间交给列表。 */
+/* 仅压缩两侧固定控件；保留虚拟列表行高，剩余空间交给列表。 */
 .sidebar,
 .inspector {
   gap: 0;
@@ -1417,7 +1431,7 @@ textarea {
   min-width: 0;
   height: 22px;
   min-height: 22px;
-  font-size: 11px;
+  font-size: var(--font-body);
   line-height: 1.25;
   white-space: nowrap;
   padding: 0 2px;

@@ -26,6 +26,7 @@
             <select id="appSwitcher" aria-label="选择应用">
               <option value="viewer">数据可视化工具</option>
               <option value="field-defect">现场缺陷展示</option>
+              <option value="model-config">模型配置</option>
             </select>
           </label>
           <span class="version-label">wanhaoming version 1.0</span>
@@ -43,7 +44,7 @@
         <section class="panel import-panel">
           <label class="field">
             <span>图片 prefix</span>
-            <input id="prefixInput" type="text" placeholder="例如: D:/dataset/images/" />
+            <input id="prefixInput" type="text" placeholder="例如: D:/dataset/images/ 或 //服务器/共享目录/" title="支持盘符路径、file:// 路径和 Windows UNC 共享路径，例如 //172.20.7.10/共享目录/" />
           </label>
           <label class="field">
             <span>导入 JSON 文件</span>

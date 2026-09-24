@@ -3,6 +3,8 @@
 
   const {
     getImageAdjustmentFilter,
+    buildImageUrl,
+    normalizeImagePath,
     getSharpenKernel,
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
@@ -436,56 +438,6 @@
     }
   }
 
-  function normalizePrefix(prefix) {
-    const value = prefix.trim();
-    if (!value) return "";
-    const hasProtocol = /^[a-z]+:\/\//i.test(value) || value.startsWith("file://");
-    let normalized = value.replace(/\\/g, "/");
-    if (/^[a-z]:\//i.test(normalized)) {
-      normalized = "file:///" + normalized;
-    }
-    if (!normalized.endsWith("/")) {
-      normalized += "/";
-    }
-    if (!hasProtocol && !/^file:\/\//i.test(normalized) && /^[a-z]:\//i.test(value.replace(/\\/g, "/"))) {
-      return normalized;
-    }
-    return normalized;
-  }
-
-  function normalizeImagePath(name) {
-    return String(name || "").trim().replace(/\\/g, "/");
-  }
-
-  function isAbsoluteImagePath(name) {
-    const normalized = normalizeImagePath(name);
-    return /^[a-z]+:\/\//i.test(normalized)
-      || /^file:\/\//i.test(normalized)
-      || /^[a-z]:\//i.test(normalized)
-      || normalized.startsWith("//");
-  }
-
-  function imagePathToUrl(name) {
-    const normalized = normalizeImagePath(name);
-    if (/^[a-z]+:\/\//i.test(normalized) || /^file:\/\//i.test(normalized)) {
-      return encodeURI(normalized).replace(/#/g, "%23");
-    }
-    if (/^[a-z]:\//i.test(normalized)) {
-      return encodeURI("file:///" + normalized).replace(/#/g, "%23");
-    }
-    if (normalized.startsWith("//")) {
-      return encodeURI("file:" + normalized).replace(/#/g, "%23");
-    }
-    return encodeURI(normalized).replace(/#/g, "%23");
-  }
-
-  function buildImageUrl(prefix, name) {
-    if (isAbsoluteImagePath(name)) {
-      return imagePathToUrl(name);
-    }
-    return normalizePrefix(prefix) + imagePathToUrl(name);
-  }
-
   function imageUrl(name) {
     return buildImageUrl(els.prefixInput.value, name);
   }
@@ -848,7 +800,7 @@
   async function startImageSizeScan() {
     const names = state.imageNames.slice();
     const jobId = state.sizeScanJobId + 1;
-    const prefix = normalizePrefix(els.prefixInput.value);
+    const prefix = els.prefixInput.value;
     const concurrency = Math.min(6, names.length);
     let nextIndex = 0;
 

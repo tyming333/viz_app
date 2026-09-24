@@ -13,6 +13,43 @@
       ? fallback : Math.max(0, Math.min(maximum, parsed));
   }
 
+  function normalizeImagePath(name) {
+    return String(name || "").trim().replace(/\\/g, "/");
+  }
+
+  function isAbsoluteImagePath(name) {
+    const normalized = normalizeImagePath(name);
+    return /^[a-z]+:\/\//i.test(normalized)
+      || /^file:\/\//i.test(normalized)
+      || /^[a-z]:\//i.test(normalized)
+      || normalized.startsWith("//");
+  }
+
+  function imagePathToUrl(name) {
+    const normalized = normalizeImagePath(name);
+    let url = normalized;
+    if (/^[a-z]:\//i.test(normalized)) url = "file:///" + normalized;
+    else if (normalized.startsWith("//")) url = "file:" + normalized;
+    return encodeURI(url).replace(/#/g, "%23");
+  }
+
+  function normalizeImagePrefix(prefix) {
+    const value = String(prefix || "").trim();
+    if (!value) return "";
+    const normalized = normalizeImagePath(value);
+    let url = normalized;
+    if (normalized.startsWith("//")) url = "file:" + normalized;
+    else if (/^[a-z]:\//i.test(normalized)) url = "file:///" + normalized;
+    if (!url.endsWith("/")) url += "/";
+    return encodeURI(url).replace(/#/g, "%23");
+  }
+
+  function buildImageUrl(prefix, name) {
+    return isAbsoluteImagePath(name)
+      ? imagePathToUrl(name)
+      : normalizeImagePrefix(prefix) + imagePathToUrl(name);
+  }
+
   function getImageAdjustmentFilter(settings) {
     const values = settings || {};
     const filter =
@@ -288,6 +325,11 @@
 
   return {
     getImageAdjustmentFilter,
+    normalizeImagePath,
+    isAbsoluteImagePath,
+    imagePathToUrl,
+    normalizeImagePrefix,
+    buildImageUrl,
     getSharpenKernel,
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
