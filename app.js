@@ -869,6 +869,8 @@
   }
 
   function applyFilters() {
+    setLabelFilterMenuOpen(false);
+    setLabelSelectOpen(false);
     // Selected labels use OR matching; without selections, the typed text keeps fuzzy matching.
     state.appliedFilters = {
       image: els.imageFilter.value,

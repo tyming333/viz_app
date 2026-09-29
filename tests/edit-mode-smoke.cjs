@@ -81,6 +81,17 @@ const server = http.createServer((req, res) => {
     editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}}]}}}));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 600"));
+  assert.equal(await evaluate(`(() => {
+    const input = document.getElementById('labelFilter');
+    input.value = 'sam';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    const opened = !document.getElementById('labelFilterMenu').hidden && input.getAttribute('aria-expanded') === 'true';
+    input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+    const closed = document.getElementById('labelFilterMenu').hidden && input.getAttribute('aria-expanded') === 'false';
+    const applied = editModeTest.state.appliedFilters.label === 'sam';
+    document.getElementById('clearFiltersBtn').click();
+    return opened && closed && applied;
+  })()`), true, "Enter applies the label filter and closes its suggestions");
   await evaluate("editModeTest.selectObject(0)");
   const original = await exported();
   assert.equal(await evaluate("document.getElementById('editModeBtn').getAttribute('aria-pressed')"), "false");
