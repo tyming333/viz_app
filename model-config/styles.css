@@ -180,6 +180,7 @@ dialog .field { margin-bottom: 12px; }
 .node-shortcuts button:hover:not(:disabled) { color: #265db9; background: #e3edfc; }
 .node-shortcuts button:disabled { opacity: .3; }
 .node-shortcuts .danger { color: #bb394b; }
+.node-shortcuts .copy-subtree-node { color: #245f9f; }
 #clipboardStatus { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .placement-dialog { width: min(760px, 94vw); }
 .placement-dialog select { width: 100%; }

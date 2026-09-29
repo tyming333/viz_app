@@ -451,10 +451,13 @@
       const copy = button("复制", () => copyToClipboard(node.path), "copy-node");
       copy.title = "复制单个节点，不包含子节点";
       copy.setAttribute("aria-label", `复制单节点 ${node.title}`);
+      const copySubtree = button("复制子树", () => copyToClipboard(node.path, true), "copy-subtree-node");
+      copySubtree.title = "复制当前节点及全部后代";
+      copySubtree.setAttribute("aria-label", `复制节点及全部子节点 ${node.title}`);
       const paste = button("粘贴", () => openPlacement("paste", node.path), "paste-node");
       paste.disabled = !clipboard;
       paste.title = "将已复制节点插入此处：前、后、子级或父级";
-      shortcuts.append(copy, paste);
+      shortcuts.append(copy, copySubtree, paste);
       for (const [label, symbol, offset, cls] of [["上移", "↑", -1, "move-up"], ["下移", "↓", 1, "move-down"]]) {
         const move = button(symbol, () => graphAction(node.path, () => {
           if (doc.move(node.path, offset)) selected = [...node.path.slice(0, -1), node.path.at(-1) + offset];
@@ -625,6 +628,7 @@
         card.querySelector(".node-select").setAttribute("aria-label", `选中节点 ${title}`);
         card.querySelector(".node-select").title = `上级传入 ${value.last_output ?? "—"} · ${title}\n${pathText(JSON.parse(card.dataset.nodePath))}`;
         card.querySelector(".copy-node").setAttribute("aria-label", `复制单节点 ${title}`);
+        card.querySelector(".copy-subtree-node").setAttribute("aria-label", `复制节点及全部子节点 ${title}`);
         card.querySelector(".move-up").setAttribute("aria-label", `上移子树 ${title}`);
         card.querySelector(".move-down").setAttribute("aria-label", `下移子树 ${title}`);
       }
