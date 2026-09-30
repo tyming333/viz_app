@@ -143,6 +143,12 @@
             </label>
             <button id="batchPreviewBtn" type="button" aria-pressed="false">批量预览</button>
             <button id="resetViewBtn" type="button">复位</button>
+            <button id="labelZoomBtn" type="button" aria-pressed="false" title="开启按标签缩放">标签缩放</button>
+            <label class="label-zoom-size-control" title="标签外接矩形的最小宽高">
+              <span>最小框</span>
+              <input id="labelZoomSizeInput" type="number" min="64" max="8192" step="64" value="1024" inputmode="numeric" aria-label="标签缩放最小框宽高" />
+              <span>px</span>
+            </label>
             <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
             <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
             <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>

@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  normalizeLabelZoomSize,
+  getLabelZoomBounds,
   collectDataLabels,
   filterLabelOptions,
   orderLabelOptions,
@@ -22,6 +24,32 @@ const {
   isCancelSelectionKey,
   getContainTransform
 } = require("../viewer-core.js");
+
+test("calculates a centered minimum-size label focus region", () => {
+  const objects = [
+    { bbox: [700, 500, 900, 500, 900, 700, 700, 700] },
+    { bbox: [1200, 800, 1400, 800, 1400, 1000, 1200, 1000] }
+  ];
+  assert.deepEqual(getLabelZoomBounds(objects, 1024, 2000, 1500), {
+    left: 538,
+    top: 238,
+    right: 1562,
+    bottom: 1262
+  });
+  assert.equal(normalizeLabelZoomSize("2048", 1024), 2048);
+  assert.equal(normalizeLabelZoomSize("", 1024), 1024);
+  assert.equal(normalizeLabelZoomSize("99999", 1024), 8192);
+});
+
+test("label focus region returns null without valid boxes and clamps to small images", () => {
+  assert.equal(getLabelZoomBounds([], 1024, 1000, 800), null);
+  assert.deepEqual(getLabelZoomBounds([{ bbox: [20, 20, 40, 20, 40, 40, 20, 40] }], 1024, 400, 300), {
+    left: 0,
+    top: 0,
+    right: 400,
+    bottom: 300
+  });
+});
 
 test("collects unique non-empty labels from the entire imported JSON", () => {
   const data = {

@@ -182,6 +182,22 @@ textarea {
   font-size: var(--font-body);
 }
 
+.label-zoom-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: var(--font-body);
+  white-space: nowrap;
+}
+
+.label-zoom-size-control input {
+  width: 58px;
+  height: 22px;
+  padding: 0 4px 0 6px;
+  font-size: var(--font-body);
+}
+
 .actions button:last-child,
 #loadBtn,
 #applyObjectBtn {

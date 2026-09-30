@@ -6,6 +6,8 @@
     buildImageUrl,
     normalizeImagePath,
     getSharpenKernel,
+    normalizeLabelZoomSize,
+    getLabelZoomBounds,
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     filterLabelOptions,
@@ -82,6 +84,8 @@
     batchGridSizeInput: document.getElementById("batchGridSizeInput"),
     batchPreviewBtn: document.getElementById("batchPreviewBtn"),
     resetViewBtn: document.getElementById("resetViewBtn"),
+    labelZoomBtn: document.getElementById("labelZoomBtn"),
+    labelZoomSizeInput: document.getElementById("labelZoomSizeInput"),
     editModeBtn: document.getElementById("editModeBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
     showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
@@ -171,7 +175,9 @@
     batchPreview: false,
     batchGridSize: 3,
     batchOffset: 0,
-    batchWheelDelta: 0
+    batchWheelDelta: 0,
+    labelZoom: false,
+    labelZoomSize: 1024
   };
 
   const preloadImages = new Map();
@@ -1494,6 +1500,13 @@
     els.keypointLabelBtn.title = state.showKeypointLabels ? "隐藏关键点标签" : "显示关键点标签";
   }
 
+  function renderLabelZoomControls() {
+    els.labelZoomBtn.classList.toggle("active", state.labelZoom);
+    els.labelZoomBtn.setAttribute("aria-pressed", String(state.labelZoom));
+    els.labelZoomBtn.title = state.labelZoom ? "关闭按标签缩放" : "开启按标签缩放";
+    els.labelZoomSizeInput.value = String(state.labelZoomSize);
+  }
+
   function updateImageSelection() {
     els.currentImageText.value = state.currentImage;
     els.currentImageText.title = state.currentImage || "可选中复制当前图片名";
@@ -1833,6 +1846,7 @@
     renderFillToggle();
     renderKeypointVisibilityToggle();
     renderKeypointLabelToggle();
+    renderLabelZoomControls();
     renderSliderValues();
     renderImageInfo();
     applyZoom();
@@ -1844,6 +1858,7 @@
     renderFillToggle();
     renderKeypointVisibilityToggle();
     renderKeypointLabelToggle();
+    renderLabelZoomControls();
     renderSliderValues();
     renderImageInfo();
     applyZoom();
@@ -1858,6 +1873,7 @@
     renderFillToggle();
     renderKeypointVisibilityToggle();
     renderKeypointLabelToggle();
+    renderLabelZoomControls();
     renderSliderValues();
     renderImageInfo();
     applyZoom();
@@ -2383,7 +2399,7 @@
     }, 0);
   }
 
-  function resetView() {
+  function resetImageView() {
     const width = els.mainImage.naturalWidth || 0;
     const height = els.mainImage.naturalHeight || 0;
     if (!width || !height) {
@@ -2407,6 +2423,36 @@
       state.viewFrame = 0;
     }
     applyViewTransform();
+  }
+
+  function focusLabelsView() {
+    const imageWidth = els.mainImage.naturalWidth || 0;
+    const imageHeight = els.mainImage.naturalHeight || 0;
+    const bounds = getLabelZoomBounds(currentObjects(), state.labelZoomSize, imageWidth, imageHeight);
+    if (!bounds) {
+      resetImageView();
+      return;
+    }
+    const availableWidth = Math.max(1, els.canvasShell.clientWidth - 24);
+    const availableHeight = Math.max(1, els.canvasShell.clientHeight - 24);
+    const boundsWidth = Math.max(1, bounds.right - bounds.left);
+    const boundsHeight = Math.max(1, bounds.bottom - bounds.top);
+    state.zoom = clampZoom(Math.min(availableWidth / boundsWidth, availableHeight / boundsHeight));
+    state.panX = Math.round(els.canvasShell.clientWidth / 2 - ((bounds.left + bounds.right) / 2) * state.zoom);
+    state.panY = Math.round(els.canvasShell.clientHeight / 2 - ((bounds.top + bounds.bottom) / 2) * state.zoom);
+    if (state.viewFrame) {
+      window.cancelAnimationFrame(state.viewFrame);
+      state.viewFrame = 0;
+    }
+    applyViewTransform();
+  }
+
+  function resetView() {
+    if (state.labelZoom) {
+      focusLabelsView();
+      return;
+    }
+    resetImageView();
   }
 
   async function copyJson() {
@@ -2443,6 +2489,19 @@
     renderEditor();
     renderOverlay();
     setStatus(state.editMode ? "已开启标注编辑" : "已关闭标注编辑", 100);
+  }
+
+  function toggleLabelZoom() {
+    state.labelZoom = !state.labelZoom;
+    renderLabelZoomControls();
+    resetView();
+    setStatus(state.labelZoom ? "已开启按标签缩放" : "已关闭按标签缩放", 100);
+  }
+
+  function updateLabelZoomSize(value) {
+    state.labelZoomSize = normalizeLabelZoomSize(value, state.labelZoomSize);
+    renderLabelZoomControls();
+    if (state.labelZoom) resetView();
   }
 
   function toggleImageExportSelection(name, checked) {
@@ -2733,6 +2792,16 @@
     setStatus("图片加载失败，请检查 prefix: " + state.currentImage, 0);
   });
   els.resetViewBtn.addEventListener("click", resetView);
+  els.labelZoomBtn.addEventListener("click", toggleLabelZoom);
+  els.labelZoomSizeInput.addEventListener("change", function onLabelZoomSizeChange(event) {
+    updateLabelZoomSize(event.target.value);
+  });
+  els.labelZoomSizeInput.addEventListener("keydown", function onLabelZoomSizeKeydown(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    updateLabelZoomSize(event.target.value);
+    event.target.blur();
+  });
   els.editModeBtn.addEventListener("click", toggleEditMode);
   els.boxVisibilityBtn.addEventListener("click", function onbox() {
     state.showBoxes = !state.showBoxes;

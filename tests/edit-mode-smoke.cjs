@@ -75,12 +75,27 @@ const server = http.createServer((req, res) => {
   await call("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/` });
   await until(() => evaluate("!!window.editModeTest"));
   await evaluate(`(() => {
-    const canvas=document.createElement('canvas'); canvas.width=600; canvas.height=400;
-    const ctx=canvas.getContext('2d'); ctx.fillStyle='#eeeeee'; ctx.fillRect(0,0,600,400);
+    const canvas=document.createElement('canvas'); canvas.width=2000; canvas.height=1500;
+    const ctx=canvas.getContext('2d'); ctx.fillStyle='#eeeeee'; ctx.fillRect(0,0,2000,1500);
     const image=URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
     editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}}]}}}));
   })()`);
-  await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 600"));
+  await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
+  assert.equal(await evaluate(`(() => {
+    const button = document.getElementById('labelZoomBtn');
+    const size = document.getElementById('labelZoomSizeInput');
+    const before = editModeTest.state.labelZoom;
+    button.click();
+    const bounds = ViewerCore.getLabelZoomBounds(editModeTest.state.data[editModeTest.state.currentImage].det.objects, editModeTest.state.labelZoomSize, 2000, 1500);
+    const centered = Math.abs(editModeTest.state.panX + (bounds.left + bounds.right) / 2 * editModeTest.state.zoom - document.getElementById('canvasShell').clientWidth / 2) < 1
+      && Math.abs(editModeTest.state.panY + (bounds.top + bounds.bottom) / 2 * editModeTest.state.zoom - document.getElementById('canvasShell').clientHeight / 2) < 1;
+    const enabled = !before && editModeTest.state.labelZoom && button.getAttribute('aria-pressed') === 'true' && centered;
+    size.value = '512';
+    size.dispatchEvent(new Event('change', {bubbles: true}));
+    const resized = editModeTest.state.labelZoomSize === 512;
+    button.click();
+    return enabled && resized && !editModeTest.state.labelZoom;
+  })()`), true, "label zoom focuses all boxes and accepts an adjustable minimum size");
   assert.equal(await evaluate(`(() => {
     const input = document.getElementById('labelFilter');
     input.value = 'sam';

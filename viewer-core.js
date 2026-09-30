@@ -160,6 +160,47 @@
     };
   }
 
+  function normalizeLabelZoomSize(value, fallback) {
+    const defaultValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 1024;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return defaultValue;
+    return Math.max(64, Math.min(8192, Math.round(parsed)));
+  }
+
+  function getLabelZoomBounds(objects, minimumSize, imageWidth, imageHeight) {
+    const items = Array.isArray(objects) ? objects : [];
+    const bounds = items.reduce(function collectBounds(result, object) {
+      const bbox = object && object.bbox;
+      if (!Array.isArray(bbox) || bbox.length !== 8 || bbox.some(function invalid(value) {
+        return typeof value !== "number" || !Number.isFinite(value);
+      })) return result;
+      const next = rectangleBounds(bbox);
+      if (!result) return next;
+      return {
+        left: Math.min(result.left, next.left),
+        top: Math.min(result.top, next.top),
+        right: Math.max(result.right, next.right),
+        bottom: Math.max(result.bottom, next.bottom)
+      };
+    }, null);
+    if (!bounds) return null;
+
+    const target = normalizeLabelZoomSize(minimumSize, 1024);
+    const imageHasSize = Number.isFinite(imageWidth) && imageWidth > 0
+      && Number.isFinite(imageHeight) && imageHeight > 0;
+    const width = Math.min(imageHasSize ? imageWidth : Infinity, Math.max(target, bounds.right - bounds.left));
+    const height = Math.min(imageHasSize ? imageHeight : Infinity, Math.max(target, bounds.bottom - bounds.top));
+    const centerX = (bounds.left + bounds.right) / 2;
+    const centerY = (bounds.top + bounds.bottom) / 2;
+    let left = centerX - width / 2;
+    let top = centerY - height / 2;
+    if (imageHasSize) {
+      left = Math.max(0, Math.min(imageWidth - width, left));
+      top = Math.max(0, Math.min(imageHeight - height, top));
+    }
+    return { left, top, right: left + width, bottom: top + height };
+  }
+
   function isAxisAlignedRectangle(bbox) {
     if (!Array.isArray(bbox) || bbox.length !== 8 || bbox.some((value) => typeof value !== "number" || !Number.isFinite(value))) {
       return false;
@@ -331,6 +372,8 @@
     normalizeImagePrefix,
     buildImageUrl,
     getSharpenKernel,
+    normalizeLabelZoomSize,
+    getLabelZoomBounds,
     NEGATIVE_LABEL_FILTER,
     collectDataLabels,
     filterLabelOptions,
