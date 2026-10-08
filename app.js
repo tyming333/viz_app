@@ -908,8 +908,10 @@
     els.heightMinFilter.value = "";
     els.heightMaxFilter.value = "";
     state.appliedFilters = { image: "", label: "", labelExact: [], widthMin: "", widthMax: "", heightMin: "", heightMax: "" };
+    state.showContainedBoxes = false;
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
+    renderBoxVisibilityToggle();
     renderAnnotationOverlays();
   }
 
@@ -929,6 +931,7 @@
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
     selectImage(firstFilteredImageName(state.filteredImageNames), { scrollList: true });
+    renderBoxVisibilityToggle();
     renderAnnotationOverlays();
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
@@ -1142,14 +1145,10 @@
     context.rect(0, 0, image.naturalWidth, image.naturalHeight);
     context.clip();
 
-    getObjects(imageName).forEach(function drawBatchObject(obj, objectIndex) {
-      const labels = Array.isArray(obj.labels) ? obj.labels : [];
-      if (!matchesOverlayLabelFilter(
-        labels,
-        state.appliedFilters.labelExact,
-        state.appliedFilters.label,
-        state.showAllOverlayObjects
-      )) return;
+    const objects = getObjects(imageName);
+    const containerBboxes = state.showContainedBoxes ? getFilteredContainerBboxes(objects) : [];
+    objects.forEach(function drawBatchObject(obj, objectIndex) {
+      if (!isObjectVisibleInOverlay(obj, objectIndex, objects, containerBboxes)) return;
       const points = bboxToPoints(obj.bbox);
       const color = getObjectColor(obj, objectIndex);
       const inverseScale = 1 / transform.scale;
@@ -1509,14 +1508,14 @@
   }
 
   function renderBoxVisibilityToggle() {
-    if (state.selectedObjectIndex < 0 || !currentObject()) state.showContainedBoxes = false;
+    if (!state.currentImage || !hasAppliedLabelFilter()) state.showContainedBoxes = false;
     els.boxVisibilityBtn.classList.toggle("active", state.showBoxes);
     els.boxVisibilityBtn.setAttribute("aria-pressed", String(state.showBoxes));
     els.boxVisibilityBtn.title = state.showBoxes ? "隐藏所有框" : "显示所有框";
     els.showAllBoxesBtn.classList.toggle("active", state.showAllOverlayObjects);
     els.showAllBoxesBtn.setAttribute("aria-pressed", String(state.showAllOverlayObjects));
     els.showAllBoxesBtn.textContent = state.showAllOverlayObjects ? "取消显示所有框" : "显示所有框";
-    els.showContainedBoxesBtn.disabled = state.selectedObjectIndex < 0 || !state.currentImage;
+    els.showContainedBoxesBtn.disabled = !state.currentImage || !hasAppliedLabelFilter();
     els.showContainedBoxesBtn.classList.toggle("active", state.showContainedBoxes);
     els.showContainedBoxesBtn.setAttribute("aria-pressed", String(state.showContainedBoxes));
   }
@@ -1535,7 +1534,7 @@
   }
 
   function toggleShowContainedBoxes() {
-    if (state.selectedObjectIndex < 0 || !state.currentImage) return;
+    if (!state.currentImage || !hasAppliedLabelFilter()) return;
     state.showContainedBoxes = !state.showContainedBoxes;
     if (state.showContainedBoxes) {
       state.showAllOverlayObjects = false;
@@ -1545,17 +1544,32 @@
     renderAnnotationOverlays();
   }
 
-  function isObjectVisibleInOverlay(obj, index, objects) {
-    if (state.showContainedBoxes && !state.batchPreview && state.selectedObjectIndex >= 0) {
-      const container = objects[state.selectedObjectIndex];
-      return index === state.selectedObjectIndex || !!container && isBboxContained(container.bbox, obj.bbox);
-    }
+  function hasAppliedLabelFilter() {
+    return !!state.appliedFilters.label.trim() || state.appliedFilters.labelExact.length > 0;
+  }
+
+  function matchesAppliedOverlayFilter(obj, showAll) {
     return matchesOverlayLabelFilter(
       Array.isArray(obj.labels) ? obj.labels : [],
       state.appliedFilters.labelExact,
       state.appliedFilters.label,
-      state.showAllOverlayObjects
+      showAll
     );
+  }
+
+  function getFilteredContainerBboxes(objects) {
+    return objects.filter(function matchesFilter(obj) {
+      return matchesAppliedOverlayFilter(obj, false);
+    }).map(function getBbox(obj) { return obj.bbox; });
+  }
+
+  function isObjectVisibleInOverlay(obj, index, objects, containerBboxes) {
+    const matches = matchesAppliedOverlayFilter(obj, state.showAllOverlayObjects);
+    if (matches || !state.showContainedBoxes) return matches;
+    const candidates = containerBboxes || getFilteredContainerBboxes(objects);
+    return candidates.some(function containsFilteredObject(bbox) {
+      return isBboxContained(bbox, obj.bbox);
+    });
   }
 
   function renderKeypointVisibilityToggle() {
@@ -1863,8 +1877,9 @@
     overlayContext.translate(state.panX, state.panY);
     overlayContext.scale(state.zoom, state.zoom);
     const objects = currentObjects();
+    const containerBboxes = state.showContainedBoxes ? getFilteredContainerBboxes(objects) : [];
     objects.forEach(function eachObject(obj, index) {
-      if (!isObjectVisibleInOverlay(obj, index, objects)) return;
+      if (!isObjectVisibleInOverlay(obj, index, objects, containerBboxes)) return;
       const points = bboxToPoints(obj.bbox);
       const color = getObjectColor(obj, index);
       const active = index === state.selectedObjectIndex;
@@ -2003,7 +2018,6 @@
     state.currentImage = nextName;
     state.currentImageIndex = nextName ? state.imageNames.indexOf(nextName) : -1;
     state.selectedObjectIndex = -1;
-    state.showContainedBoxes = false;
     updateImageSelection();
     if (options && options.scrollList) {
       scrollCurrentImageIntoView();
@@ -2054,7 +2068,6 @@
       || !!state.pan
       || state.hoverTarget.kind !== "none";
     state.selectedObjectIndex = -1;
-    state.showContainedBoxes = false;
     state.pendingKeypointPlacement = null;
     state.drag = null;
     state.pan = null;

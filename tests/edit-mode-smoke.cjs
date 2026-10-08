@@ -78,7 +78,7 @@ const server = http.createServer((req, res) => {
     const canvas=document.createElement('canvas'); canvas.width=2000; canvas.height=1500;
     const ctx=canvas.getContext('2d'); ctx.fillStyle='#eeeeee'; ctx.fillRect(0,0,2000,1500);
     const image=URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
-    editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}},{labels:['inside'],bbox:[260,220,280,220,280,240,260,240]},{labels:['outside'],bbox:[310,120,330,120,330,140,310,140]}]}}}));
+    editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}},{labels:['inside'],bbox:[260,220,280,220,280,240,260,240]},{labels:['outside'],bbox:[710,120,730,120,730,140,710,140]},{labels:['sample-other'],bbox:[400,100,600,100,600,260,400,260]},{labels:['inside-2'],bbox:[560,220,580,220,580,240,560,240]}]}}}));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
   assert.equal(await evaluate("document.getElementById('strokeWidthRange').value"), "2", "stroke width uses the new default");
@@ -131,18 +131,21 @@ const server = http.createServer((req, res) => {
     document.getElementById('clearFiltersBtn').click();
     return opened && closed && applied;
   })()`), true, "Enter applies the label filter and closes its suggestions");
-  await evaluate("editModeTest.selectObject(0)");
   assert.equal(await evaluate(`(() => {
     const button = document.getElementById('showContainedBoxesBtn');
     const objects = editModeTest.state.data[editModeTest.state.currentImage].det.objects;
-    editModeTest.state.appliedFilters.label = 'sample';
+    const input = document.getElementById('labelFilter');
+    input.value = 'sample';
+    document.getElementById('applyFiltersBtn').click();
+    const noSelection = editModeTest.state.selectedObjectIndex === -1 && !button.disabled;
     button.click();
     const active = editModeTest.state.showContainedBoxes && button.getAttribute('aria-pressed') === 'true';
     const visible = objects.map((obj, index) => editModeTest.isObjectVisibleInOverlay(obj, index, objects));
     button.click();
-    editModeTest.state.appliedFilters.label = '';
-    return active && visible.join(',') === 'true,true,false' && !editModeTest.state.showContainedBoxes;
-  })()`), true, "contained-box toggle includes only fully enclosed boxes");
+    document.getElementById('clearFiltersBtn').click();
+    return noSelection && active && visible.join(',') === 'true,true,false,true,true' && !editModeTest.state.showContainedBoxes;
+  })()`), true, "contained-box toggle expands every filtered box without selecting one");
+  await evaluate("editModeTest.selectObject(0)");
   const original = await exported();
   assert.equal(await evaluate("document.getElementById('editModeBtn').getAttribute('aria-pressed')"), "false");
   assert.equal(await evaluate("Array.from(document.querySelectorAll('#labelsEditor, #bboxGrid input, #keypointList input, #keypointList button, #addRectangleBtn, #addQuadrilateralBtn, #deleteObjectBtn, #addKeypointBtn, #applyObjectBtn')).every(el=>el.disabled)"), true);
