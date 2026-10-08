@@ -149,13 +149,6 @@
               <input id="labelZoomSizeInput" type="number" min="64" max="8192" step="64" value="1024" inputmode="numeric" aria-label="标签缩放最小框宽高" />
               <span>px</span>
             </label>
-            <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
-            <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
-            <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
-            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
-            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
-            <button id="showAllBoxesBtn" type="button">显示所有框</button>
-            <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
             <div class="annotation-style-controls" role="group" aria-label="标注样式">
               <label class="toolbar-slider" title="框线基础粗细">
                 <button id="strokeWidthReset" class="toolbar-reset" type="button" title="恢复默认框粗细">框粗细</button>
@@ -173,6 +166,13 @@
                 <output id="labelSizeText">12</output>
               </label>
             </div>
+            <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
+            <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
+            <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
+            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
+            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
+            <button id="showAllBoxesBtn" type="button">显示所有框</button>
+            <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
           </div>
 
           <div class="image-adjustments" role="group" aria-label="图像调整">
