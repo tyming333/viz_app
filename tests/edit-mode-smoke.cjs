@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
     if (error) { res.writeHead(404); res.end(); return; }
     res.setHeader("Content-Type", ({ ".html": "text/html", ".js": "text/javascript", ".css": "text/css" })[path.extname(file)] || "application/octet-stream");
     // Expose state only in the test server, so assertions inspect exported data too.
-    if (file === path.join(root, "app.js")) bytes = bytes.toString().replace(/\}\)\(\);\s*$/, "window.editModeTest = { state, exportText, loadJsonOnMainThread, selectObject };})();");
+    if (file === path.join(root, "app.js")) bytes = bytes.toString().replace(/\}\)\(\);\s*$/, "window.editModeTest = { state, exportText, loadJsonOnMainThread, selectObject, isObjectVisibleInOverlay };})();");
     res.end(bytes);
   });
 });
@@ -78,7 +78,7 @@ const server = http.createServer((req, res) => {
     const canvas=document.createElement('canvas'); canvas.width=2000; canvas.height=1500;
     const ctx=canvas.getContext('2d'); ctx.fillStyle='#eeeeee'; ctx.fillRect(0,0,2000,1500);
     const image=URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
-    editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}}]}}}));
+    editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}},{labels:['inside'],bbox:[260,220,280,220,280,240,260,240]},{labels:['outside'],bbox:[310,120,330,120,330,140,310,140]}]}}}));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
   assert.equal(await evaluate("document.getElementById('strokeWidthRange').value"), "2", "stroke width uses the new default");
@@ -132,6 +132,17 @@ const server = http.createServer((req, res) => {
     return opened && closed && applied;
   })()`), true, "Enter applies the label filter and closes its suggestions");
   await evaluate("editModeTest.selectObject(0)");
+  assert.equal(await evaluate(`(() => {
+    const button = document.getElementById('showContainedBoxesBtn');
+    const objects = editModeTest.state.data[editModeTest.state.currentImage].det.objects;
+    editModeTest.state.appliedFilters.label = 'sample';
+    button.click();
+    const active = editModeTest.state.showContainedBoxes && button.getAttribute('aria-pressed') === 'true';
+    const visible = objects.map((obj, index) => editModeTest.isObjectVisibleInOverlay(obj, index, objects));
+    button.click();
+    editModeTest.state.appliedFilters.label = '';
+    return active && visible.join(',') === 'true,true,false' && !editModeTest.state.showContainedBoxes;
+  })()`), true, "contained-box toggle includes only fully enclosed boxes");
   const original = await exported();
   assert.equal(await evaluate("document.getElementById('editModeBtn').getAttribute('aria-pressed')"), "false");
   assert.equal(await evaluate("Array.from(document.querySelectorAll('#labelsEditor, #bboxGrid input, #keypointList input, #keypointList button, #addRectangleBtn, #addQuadrilateralBtn, #deleteObjectBtn, #addKeypointBtn, #applyObjectBtn')).every(el=>el.disabled)"), true);

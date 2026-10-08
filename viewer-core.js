@@ -160,6 +160,52 @@
     };
   }
 
+  function isBboxContained(container, candidate) {
+    if (![container, candidate].every(function validBbox(bbox) {
+      return Array.isArray(bbox) && bbox.length === 8 && bbox.every(Number.isFinite);
+    })) return false;
+    const polygon = [0, 2, 4, 6].map(function point(index) {
+      return [container[index], container[index + 1]];
+    });
+    const area = polygon.reduce(function signedArea(sum, point, index) {
+      const next = polygon[(index + 1) % polygon.length];
+      return sum + point[0] * next[1] - next[0] * point[1];
+    }, 0);
+    if (Math.abs(area) < 1e-8) return false;
+    function inside(x, y) {
+      let result = false;
+      for (let edge = 0, previous = polygon.length - 1; edge < polygon.length; previous = edge, edge += 1) {
+        const start = polygon[previous];
+        const end = polygon[edge];
+        const cross = (end[0] - start[0]) * (y - start[1]) - (end[1] - start[1]) * (x - start[0]);
+        if (Math.abs(cross) < 1e-8 && x >= Math.min(start[0], end[0]) && x <= Math.max(start[0], end[0])
+          && y >= Math.min(start[1], end[1]) && y <= Math.max(start[1], end[1])) return true;
+        if ((start[1] > y) !== (end[1] > y)
+          && x < (end[0] - start[0]) * (y - start[1]) / (end[1] - start[1]) + start[0]) result = !result;
+      }
+      return result;
+    }
+    for (let index = 0; index < candidate.length; index += 2) {
+      const x = candidate[index];
+      const y = candidate[index + 1];
+      if (!inside(x, y)) return false;
+      const next = (index + 2) % candidate.length;
+      const endX = candidate[next];
+      const endY = candidate[next + 1];
+      if (!inside((x + endX) / 2, (y + endY) / 2)) return false;
+      for (let edge = 0; edge < polygon.length; edge += 1) {
+        const start = polygon[edge];
+        const end = polygon[(edge + 1) % polygon.length];
+        const crossStart = (endX - x) * (start[1] - y) - (endY - y) * (start[0] - x);
+        const crossEnd = (endX - x) * (end[1] - y) - (endY - y) * (end[0] - x);
+        const crossFrom = (end[0] - start[0]) * (y - start[1]) - (end[1] - start[1]) * (x - start[0]);
+        const crossTo = (end[0] - start[0]) * (endY - start[1]) - (end[1] - start[1]) * (endX - start[0]);
+        if (crossStart * crossEnd < -1e-8 && crossFrom * crossTo < -1e-8) return false;
+      }
+    }
+    return true;
+  }
+
   function normalizeLabelZoomSize(value, fallback) {
     const defaultValue = Number.isFinite(Number(fallback)) ? Number(fallback) : 1024;
     const parsed = Number(value);
@@ -380,6 +426,7 @@
     orderLabelOptions,
     matchesLabelFilter,
     matchesOverlayLabelFilter,
+    isBboxContained,
     firstFilteredImageName,
     isAxisAlignedRectangle,
     setRectangleHandlePosition,

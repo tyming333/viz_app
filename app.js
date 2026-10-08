@@ -14,6 +14,7 @@
     orderLabelOptions,
     matchesLabelFilter,
     matchesOverlayLabelFilter,
+    isBboxContained,
     firstFilteredImageName,
     isAxisAlignedRectangle,
     setRectangleHandlePosition,
@@ -89,6 +90,7 @@
     editModeBtn: document.getElementById("editModeBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
     showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
+    showContainedBoxesBtn: document.getElementById("showContainedBoxesBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
     keypointVisibilityBtn: document.getElementById("keypointVisibilityBtn"),
     keypointLabelBtn: document.getElementById("keypointLabelBtn"),
@@ -183,6 +185,7 @@
     editMode: false,
     showBoxes: true,
     showAllOverlayObjects: false,
+    showContainedBoxes: false,
     showBoxFill: true,
     boxFillOpacity: 10,
     showKeypoints: true,
@@ -1506,12 +1509,16 @@
   }
 
   function renderBoxVisibilityToggle() {
+    if (state.selectedObjectIndex < 0 || !currentObject()) state.showContainedBoxes = false;
     els.boxVisibilityBtn.classList.toggle("active", state.showBoxes);
     els.boxVisibilityBtn.setAttribute("aria-pressed", String(state.showBoxes));
     els.boxVisibilityBtn.title = state.showBoxes ? "隐藏所有框" : "显示所有框";
     els.showAllBoxesBtn.classList.toggle("active", state.showAllOverlayObjects);
     els.showAllBoxesBtn.setAttribute("aria-pressed", String(state.showAllOverlayObjects));
     els.showAllBoxesBtn.textContent = state.showAllOverlayObjects ? "取消显示所有框" : "显示所有框";
+    els.showContainedBoxesBtn.disabled = state.selectedObjectIndex < 0 || !state.currentImage;
+    els.showContainedBoxesBtn.classList.toggle("active", state.showContainedBoxes);
+    els.showContainedBoxesBtn.setAttribute("aria-pressed", String(state.showContainedBoxes));
   }
 
   function renderFillToggle() {
@@ -1521,9 +1528,34 @@
 
   function toggleShowAllBoxes() {
     state.showAllOverlayObjects = !state.showAllOverlayObjects;
+    if (state.showAllOverlayObjects) state.showContainedBoxes = false;
     if (state.showAllOverlayObjects) state.showBoxes = true;
     renderBoxVisibilityToggle();
     renderAnnotationOverlays();
+  }
+
+  function toggleShowContainedBoxes() {
+    if (state.selectedObjectIndex < 0 || !state.currentImage) return;
+    state.showContainedBoxes = !state.showContainedBoxes;
+    if (state.showContainedBoxes) {
+      state.showAllOverlayObjects = false;
+      state.showBoxes = true;
+    }
+    renderBoxVisibilityToggle();
+    renderAnnotationOverlays();
+  }
+
+  function isObjectVisibleInOverlay(obj, index, objects) {
+    if (state.showContainedBoxes && !state.batchPreview && state.selectedObjectIndex >= 0) {
+      const container = objects[state.selectedObjectIndex];
+      return index === state.selectedObjectIndex || !!container && isBboxContained(container.bbox, obj.bbox);
+    }
+    return matchesOverlayLabelFilter(
+      Array.isArray(obj.labels) ? obj.labels : [],
+      state.appliedFilters.labelExact,
+      state.appliedFilters.label,
+      state.showAllOverlayObjects
+    );
   }
 
   function renderKeypointVisibilityToggle() {
@@ -1832,13 +1864,7 @@
     overlayContext.scale(state.zoom, state.zoom);
     const objects = currentObjects();
     objects.forEach(function eachObject(obj, index) {
-      const labels = Array.isArray(obj.labels) ? obj.labels : [];
-      if (!matchesOverlayLabelFilter(
-        labels,
-        state.appliedFilters.labelExact,
-        state.appliedFilters.label,
-        state.showAllOverlayObjects
-      )) return;
+      if (!isObjectVisibleInOverlay(obj, index, objects)) return;
       const points = bboxToPoints(obj.bbox);
       const color = getObjectColor(obj, index);
       const active = index === state.selectedObjectIndex;
@@ -1977,6 +2003,7 @@
     state.currentImage = nextName;
     state.currentImageIndex = nextName ? state.imageNames.indexOf(nextName) : -1;
     state.selectedObjectIndex = -1;
+    state.showContainedBoxes = false;
     updateImageSelection();
     if (options && options.scrollList) {
       scrollCurrentImageIntoView();
@@ -2015,6 +2042,7 @@
     state.selectedObjectIndex = index;
     objectListView.rerender(state.selectedObjectIndex);
     renderEditor();
+    renderBoxVisibilityToggle();
     renderOverlay();
     scrollSelectedObjectIntoView();
   }
@@ -2026,6 +2054,7 @@
       || !!state.pan
       || state.hoverTarget.kind !== "none";
     state.selectedObjectIndex = -1;
+    state.showContainedBoxes = false;
     state.pendingKeypointPlacement = null;
     state.drag = null;
     state.pan = null;
@@ -2034,6 +2063,7 @@
     setHoverTarget({ kind: "none", index: -1 });
     objectListView.rerender(-1);
     renderEditor();
+    renderBoxVisibilityToggle();
     renderOverlay();
     if (hadSelection) setStatus("已取消选中", 100);
     return hadSelection;
@@ -2852,6 +2882,7 @@
     renderAnnotationOverlays();
   });
   els.showAllBoxesBtn.addEventListener("click", toggleShowAllBoxes);
+  els.showContainedBoxesBtn.addEventListener("click", toggleShowContainedBoxes);
   els.keypointVisibilityBtn.addEventListener("click", function onkeypoints() {
     state.showKeypoints = !state.showKeypoints;
     renderKeypointVisibilityToggle();

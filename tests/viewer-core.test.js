@@ -22,8 +22,19 @@ const {
   NEGATIVE_LABEL_FILTER,
   matchesOverlayLabelFilter,
   isCancelSelectionKey,
-  getContainTransform
+  getContainTransform,
+  isBboxContained
 } = require("../viewer-core.js");
+
+test("detects boxes fully contained by the selected box", () => {
+  const outer = [10, 10, 90, 10, 90, 90, 10, 90];
+  assert.equal(isBboxContained(outer, [20, 20, 40, 20, 40, 40, 20, 40]), true);
+  assert.equal(isBboxContained(outer, [0, 20, 40, 20, 40, 40, 0, 40]), false);
+  assert.equal(isBboxContained(outer, [20, 20, 80, 20, 80, 80, 20, 80]), true);
+  const diamond = [50, 10, 90, 50, 50, 90, 10, 50];
+  assert.equal(isBboxContained(diamond, [40, 40, 60, 40, 60, 60, 40, 60]), true);
+  assert.equal(isBboxContained(diamond, [20, 20, 80, 20, 80, 80, 20, 80]), false);
+});
 
 test("calculates a centered minimum-size label focus region", () => {
   const objects = [
