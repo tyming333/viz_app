@@ -166,6 +166,37 @@ textarea {
   font-size: var(--font-body);
 }
 
+.annotation-style-controls {
+  flex: 0 0 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 600px;
+  min-width: 0;
+}
+
+.annotation-style-controls .toolbar-slider {
+  min-width: 0;
+  gap: 3px;
+}
+
+.annotation-style-controls .toolbar-reset {
+  flex: 0 0 auto;
+  min-height: 18px;
+  padding: 0;
+}
+
+.annotation-style-controls input[type="range"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.annotation-style-controls output {
+  flex: 0 0 26px;
+  min-width: 26px;
+}
+
 .batch-size-control {
   display: flex;
   align-items: center;

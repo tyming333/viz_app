@@ -156,21 +156,23 @@
             <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
             <button id="showAllBoxesBtn" type="button">显示所有框</button>
             <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
-            <label class="toolbar-slider" title="框线基础粗细">
-              <button id="strokeWidthReset" class="toolbar-reset" type="button" title="恢复默认框粗细">框粗细</button>
-              <input id="strokeWidthRange" type="range" min="0.5" max="12" step="0.5" value="2" />
-              <output id="strokeWidthText">2</output>
-            </label>
-            <label class="toolbar-slider" title="框填充不透明度">
-              <button id="boxFillOpacityReset" class="toolbar-reset" type="button" title="恢复默认填充不透明度">填充</button>
-              <input id="boxFillOpacityRange" type="range" min="0" max="100" step="1" value="10" />
-              <output id="boxFillOpacityText">10%</output>
-            </label>
-            <label class="toolbar-slider" title="标签字体基础大小">
-              <button id="labelSizeReset" class="toolbar-reset" type="button" title="恢复默认字体大小">字体</button>
-              <input id="labelSizeRange" type="range" min="8" max="28" step="1" value="12" />
-              <output id="labelSizeText">12</output>
-            </label>
+            <div class="annotation-style-controls" role="group" aria-label="标注样式">
+              <label class="toolbar-slider" title="框线基础粗细">
+                <button id="strokeWidthReset" class="toolbar-reset" type="button" title="恢复默认框粗细">框粗细</button>
+                <input id="strokeWidthRange" type="range" min="0.5" max="12" step="0.5" value="2" />
+                <output id="strokeWidthText">2</output>
+              </label>
+              <label class="toolbar-slider" title="框填充不透明度">
+                <button id="boxFillOpacityReset" class="toolbar-reset" type="button" title="恢复默认填充不透明度">填充</button>
+                <input id="boxFillOpacityRange" type="range" min="0" max="100" step="1" value="10" />
+                <output id="boxFillOpacityText">10%</output>
+              </label>
+              <label class="toolbar-slider" title="标签字体基础大小">
+                <button id="labelSizeReset" class="toolbar-reset" type="button" title="恢复默认字体大小">字体</button>
+                <input id="labelSizeRange" type="range" min="8" max="28" step="1" value="12" />
+                <output id="labelSizeText">12</output>
+              </label>
+            </div>
           </div>
 
           <div class="image-adjustments" role="group" aria-label="图像调整">
