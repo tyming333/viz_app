@@ -81,7 +81,9 @@ const server = http.createServer((req, res) => {
     editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}}]}}}));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
-  assert.equal(await evaluate("document.getElementById('boxFillOpacityRange').value"), "14", "fill opacity keeps the current default");
+  assert.equal(await evaluate("document.getElementById('strokeWidthRange').value"), "2", "stroke width uses the new default");
+  assert.equal(await evaluate("document.getElementById('boxFillOpacityRange').value"), "10", "fill opacity uses the new default");
+  assert.equal(await evaluate("document.getElementById('labelSizeRange').value"), "12", "label size uses the new default");
   assert.equal(await evaluate(`(() => {
     const input = document.getElementById('boxFillOpacityRange');
     input.value = '0';
@@ -91,7 +93,18 @@ const server = http.createServer((req, res) => {
     input.dispatchEvent(new Event('input', {bubbles: true}));
     return transparent && editModeTest.state.boxFillOpacity === 100;
   })()`), true, "fill opacity can be adjusted from transparent to fully opaque");
-  await evaluate("document.getElementById('boxFillOpacityRange').value = '14'; document.getElementById('boxFillOpacityRange').dispatchEvent(new Event('input', {bubbles: true}))");
+  await evaluate("document.getElementById('boxFillOpacityRange').value = '10'; document.getElementById('boxFillOpacityRange').dispatchEvent(new Event('input', {bubbles: true}))");
+  assert.equal(await evaluate(`(() => {
+    editModeTest.state.boxStrokeWidth = 8;
+    editModeTest.state.boxFillOpacity = 80;
+    editModeTest.state.labelFontSize = 24;
+    document.getElementById('strokeWidthReset').click();
+    document.getElementById('boxFillOpacityReset').click();
+    document.getElementById('labelSizeReset').click();
+    return editModeTest.state.boxStrokeWidth === 2
+      && editModeTest.state.boxFillOpacity === 10
+      && editModeTest.state.labelFontSize === 12;
+  })()`), true, "control labels restore defaults on click");
   assert.equal(await evaluate(`(() => {
     const button = document.getElementById('labelZoomBtn');
     const size = document.getElementById('labelZoomSizeInput');

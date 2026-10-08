@@ -94,10 +94,13 @@
     keypointLabelBtn: document.getElementById("keypointLabelBtn"),
     strokeWidthRange: document.getElementById("strokeWidthRange"),
     strokeWidthText: document.getElementById("strokeWidthText"),
+    strokeWidthReset: document.getElementById("strokeWidthReset"),
     boxFillOpacityRange: document.getElementById("boxFillOpacityRange"),
     boxFillOpacityText: document.getElementById("boxFillOpacityText"),
+    boxFillOpacityReset: document.getElementById("boxFillOpacityReset"),
     labelSizeRange: document.getElementById("labelSizeRange"),
     labelSizeText: document.getElementById("labelSizeText"),
+    labelSizeReset: document.getElementById("labelSizeReset"),
     imageInfoIndex: document.getElementById("imageInfoIndex"),
     imageInfoSize: document.getElementById("imageInfoSize"),
     imageInfoObjects: document.getElementById("imageInfoObjects"),
@@ -148,8 +151,7 @@
   }
 
   function getBoxFillOpacity(active) {
-    const base = Number(state.boxFillOpacity) / 14;
-    return Math.min(1, Math.max(0, base * (active ? 0.25 : 0.14)));
+    return Math.min(1, Math.max(0, Number(state.boxFillOpacity) / 100));
   }
 
   const state = {
@@ -182,11 +184,11 @@
     showBoxes: true,
     showAllOverlayObjects: false,
     showBoxFill: true,
-    boxFillOpacity: 14,
+    boxFillOpacity: 10,
     showKeypoints: true,
     showKeypointLabels: true,
-    boxStrokeWidth: 3,
-    labelFontSize: 13,
+    boxStrokeWidth: 2,
+    labelFontSize: 12,
     imageBrightness: 100,
     imageContrast: 100,
     imageSaturation: 100,
@@ -2861,18 +2863,33 @@
     renderAnnotationOverlays();
   });
   els.strokeWidthRange.addEventListener("input", function oninput(event) {
-    state.boxStrokeWidth = Number(event.target.value) || 3;
+    state.boxStrokeWidth = Number(event.target.value) || 2;
+    renderSliderValues();
+    renderAnnotationOverlays();
+  });
+  els.strokeWidthReset.addEventListener("click", function resetStrokeWidth() {
+    state.boxStrokeWidth = 2;
     renderSliderValues();
     renderAnnotationOverlays();
   });
   els.boxFillOpacityRange.addEventListener("input", function oninput(event) {
     const value = Number(event.target.value);
-    state.boxFillOpacity = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 14;
+    state.boxFillOpacity = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 10;
+    renderSliderValues();
+    renderAnnotationOverlays();
+  });
+  els.boxFillOpacityReset.addEventListener("click", function resetBoxFillOpacity() {
+    state.boxFillOpacity = 10;
     renderSliderValues();
     renderAnnotationOverlays();
   });
   els.labelSizeRange.addEventListener("input", function oninput(event) {
-    state.labelFontSize = Number(event.target.value) || 13;
+    state.labelFontSize = Number(event.target.value) || 12;
+    renderSliderValues();
+    renderAnnotationOverlays();
+  });
+  els.labelSizeReset.addEventListener("click", function resetLabelSize() {
+    state.labelFontSize = 12;
     renderSliderValues();
     renderAnnotationOverlays();
   });
