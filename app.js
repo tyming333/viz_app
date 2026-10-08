@@ -119,6 +119,32 @@
   const pointNames = ["x1", "y1", "x2", "y2", "x3", "y3", "x4", "y4"];
   const overlayContext = els.overlayCanvas.getContext("2d");
 
+  function colorWithAlpha(color, alpha) {
+    const match = /^#([0-9a-f]{6})$/i.exec(String(color || ""));
+    if (!match) {
+      const hsl = /^hsl\(([^)]+)\)$/i.exec(String(color || ""));
+      return hsl ? "hsl(" + hsl[1] + " / " + alpha + ")" : color;
+    }
+    const value = match[1];
+    const red = Number.parseInt(value.slice(0, 2), 16);
+    const green = Number.parseInt(value.slice(2, 4), 16);
+    const blue = Number.parseInt(value.slice(4, 6), 16);
+    return "rgba(" + red + "," + green + "," + blue + "," + alpha + ")";
+  }
+
+  function getObjectColor(obj, objectIndex) {
+    const rawLabel = obj && Array.isArray(obj.labels) ? obj.labels[0] : "";
+    const label = String(rawLabel === undefined || rawLabel === null ? "" : rawLabel).trim().toLocaleLowerCase("zh-CN");
+    const labelIndex = label
+      ? state.labelOptions.findIndex(function findLabel(option) {
+        return String(option).trim().toLocaleLowerCase("zh-CN") === label;
+      })
+      : -1;
+    const index = labelIndex >= 0 ? labelIndex : Math.max(0, Number(objectIndex) || 0);
+    if (index < colors.length) return colors[index];
+    return "hsl(" + ((index * 137.508) % 360).toFixed(1) + ", 78%, 58%)";
+  }
+
   const state = {
     data: null,
     imageNames: [],
@@ -1112,7 +1138,7 @@
         state.showAllOverlayObjects
       )) return;
       const points = bboxToPoints(obj.bbox);
-      const color = colors[objectIndex % colors.length];
+      const color = getObjectColor(obj, objectIndex);
       const inverseScale = 1 / transform.scale;
 
       if (state.showBoxes) {
@@ -1126,7 +1152,7 @@
         context.lineWidth = state.boxStrokeWidth * inverseScale;
         context.strokeStyle = color;
         if (state.showBoxFill) {
-          context.fillStyle = "rgba(37,99,235,0.14)";
+          context.fillStyle = colorWithAlpha(color, 0.14);
           context.fill();
         }
         context.stroke();
@@ -1672,7 +1698,7 @@
     if (state.showBoxFill) {
       overlayContext.fillStyle = hovered
         ? "rgba(250,204,21," + (0.10 + pulse * 0.08).toFixed(2) + ")"
-        : active ? "rgba(15,118,110,0.25)" : fillStyle;
+        : colorWithAlpha(color, active ? 0.25 : 0.14);
       overlayContext.fill();
     }
     overlayContext.stroke();
@@ -1802,7 +1828,7 @@
         state.showAllOverlayObjects
       )) return;
       const points = bboxToPoints(obj.bbox);
-      const color = colors[index % colors.length];
+      const color = getObjectColor(obj, index);
       const active = index === state.selectedObjectIndex;
       const hovered = active && state.hoverTarget.kind === "object";
       if (state.showBoxes) {
