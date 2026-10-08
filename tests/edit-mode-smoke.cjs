@@ -81,6 +81,17 @@ const server = http.createServer((req, res) => {
     editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}}]}}}));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
+  assert.equal(await evaluate("document.getElementById('boxFillOpacityRange').value"), "14", "fill opacity keeps the current default");
+  assert.equal(await evaluate(`(() => {
+    const input = document.getElementById('boxFillOpacityRange');
+    input.value = '0';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    const transparent = editModeTest.state.boxFillOpacity === 0;
+    input.value = '100';
+    input.dispatchEvent(new Event('input', {bubbles: true}));
+    return transparent && editModeTest.state.boxFillOpacity === 100;
+  })()`), true, "fill opacity can be adjusted from transparent to fully opaque");
+  await evaluate("document.getElementById('boxFillOpacityRange').value = '14'; document.getElementById('boxFillOpacityRange').dispatchEvent(new Event('input', {bubbles: true}))");
   assert.equal(await evaluate(`(() => {
     const button = document.getElementById('labelZoomBtn');
     const size = document.getElementById('labelZoomSizeInput');

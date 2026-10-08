@@ -94,6 +94,8 @@
     keypointLabelBtn: document.getElementById("keypointLabelBtn"),
     strokeWidthRange: document.getElementById("strokeWidthRange"),
     strokeWidthText: document.getElementById("strokeWidthText"),
+    boxFillOpacityRange: document.getElementById("boxFillOpacityRange"),
+    boxFillOpacityText: document.getElementById("boxFillOpacityText"),
     labelSizeRange: document.getElementById("labelSizeRange"),
     labelSizeText: document.getElementById("labelSizeText"),
     imageInfoIndex: document.getElementById("imageInfoIndex"),
@@ -145,6 +147,11 @@
     return "hsl(" + ((index * 137.508) % 360).toFixed(1) + ", 78%, 58%)";
   }
 
+  function getBoxFillOpacity(active) {
+    const base = Number(state.boxFillOpacity) / 14;
+    return Math.min(1, Math.max(0, base * (active ? 0.25 : 0.14)));
+  }
+
   const state = {
     data: null,
     imageNames: [],
@@ -175,6 +182,7 @@
     showBoxes: true,
     showAllOverlayObjects: false,
     showBoxFill: true,
+    boxFillOpacity: 14,
     showKeypoints: true,
     showKeypointLabels: true,
     boxStrokeWidth: 3,
@@ -1152,7 +1160,7 @@
         context.lineWidth = state.boxStrokeWidth * inverseScale;
         context.strokeStyle = color;
         if (state.showBoxFill) {
-          context.fillStyle = colorWithAlpha(color, 0.14);
+          context.fillStyle = colorWithAlpha(color, getBoxFillOpacity(false));
           context.fill();
         }
         context.stroke();
@@ -1485,6 +1493,8 @@
   function renderSliderValues() {
     els.strokeWidthRange.value = String(state.boxStrokeWidth);
     els.strokeWidthText.textContent = formatSliderValue(state.boxStrokeWidth);
+    els.boxFillOpacityRange.value = String(state.boxFillOpacity);
+    els.boxFillOpacityText.textContent = Math.round(state.boxFillOpacity) + "%";
     els.labelSizeRange.value = String(state.labelFontSize);
     els.labelSizeText.textContent = String(state.labelFontSize);
     imageAdjustmentControls.forEach(function renderAdjustment(control) {
@@ -1698,7 +1708,7 @@
     if (state.showBoxFill) {
       overlayContext.fillStyle = hovered
         ? "rgba(250,204,21," + (0.10 + pulse * 0.08).toFixed(2) + ")"
-        : colorWithAlpha(color, active ? 0.25 : 0.14);
+        : colorWithAlpha(color, getBoxFillOpacity(active));
       overlayContext.fill();
     }
     overlayContext.stroke();
@@ -2852,6 +2862,12 @@
   });
   els.strokeWidthRange.addEventListener("input", function oninput(event) {
     state.boxStrokeWidth = Number(event.target.value) || 3;
+    renderSliderValues();
+    renderAnnotationOverlays();
+  });
+  els.boxFillOpacityRange.addEventListener("input", function oninput(event) {
+    const value = Number(event.target.value);
+    state.boxFillOpacity = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 14;
     renderSliderValues();
     renderAnnotationOverlays();
   });
