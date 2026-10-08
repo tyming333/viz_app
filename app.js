@@ -123,7 +123,7 @@
     const match = /^#([0-9a-f]{6})$/i.exec(String(color || ""));
     if (!match) {
       const hsl = /^hsl\(([^)]+)\)$/i.exec(String(color || ""));
-      return hsl ? "hsl(" + hsl[1] + " / " + alpha + ")" : color;
+      return hsl ? "hsla(" + hsl[1] + ", " + alpha + ")" : color;
     }
     const value = match[1];
     const red = Number.parseInt(value.slice(0, 2), 16);
