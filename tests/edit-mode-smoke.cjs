@@ -78,9 +78,46 @@ const server = http.createServer((req, res) => {
     const canvas=document.createElement('canvas'); canvas.width=2000; canvas.height=1500;
     const ctx=canvas.getContext('2d'); ctx.fillStyle='#eeeeee'; ctx.fillRect(0,0,2000,1500);
     const image=URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
-    editModeTest.loadJsonOnMainThread(JSON.stringify({[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}},{labels:['inside'],bbox:[260,220,280,220,280,240,260,240]},{labels:['outside'],bbox:[710,120,730,120,730,140,710,140]},{labels:['sample-other'],bbox:[400,100,600,100,600,260,400,260]},{labels:['inside-2'],bbox:[560,220,580,220,580,240,560,240]}]}}}));
+    const data = {[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}},{labels:['inside'],bbox:[260,220,280,220,280,240,260,240]},{labels:['outside'],bbox:[710,120,730,120,730,140,710,140]},{labels:['sample-other'],bbox:[400,100,600,100,600,260,400,260]},{labels:['inside-2'],bbox:[560,220,580,220,580,240,560,240]}]}}};
+    const secondImage = URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
+    data[secondImage] = structuredClone(data[image]);
+    editModeTest.loadJsonOnMainThread(JSON.stringify(data));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
+  await evaluate(`(() => {
+    window.boxLabelDraws = [];
+    window.originalFillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function(text, ...args) {
+      boxLabelDraws.push({text, canvas: this.canvas.id || this.canvas.className});
+      return originalFillText.call(this, text, ...args);
+    };
+  })()`);
+  assert.equal(await evaluate("document.getElementById('boxLabelBtn').getAttribute('aria-pressed')"), "true", "box labels are enabled by default");
+  await click("strokeWidthReset");
+  assert.equal(await evaluate("boxLabelDraws.some(draw => draw.canvas === 'overlayCanvas' && draw.text === 'sample')"), true, "single image draws box labels by default");
+  await evaluate("boxLabelDraws.length = 0");
+  await click("boxLabelBtn");
+  assert.equal(await evaluate("boxLabelDraws.some(draw => draw.text === 'sample')"), false, "turning off box labels suppresses their drawing");
+  assert.equal(await evaluate("boxLabelDraws.some(draw => draw.text === 'point') && editModeTest.state.showBoxes"), true, "box visibility and keypoint labels remain enabled");
+  for (const [button, index] of [["nextImageBtn", 1], ["prevImageBtn", 0]]) {
+    await evaluate("boxLabelDraws.length = 0");
+    await click(button);
+    await until(() => evaluate(`editModeTest.state.currentImageIndex === ${index} && boxLabelDraws.some(draw => draw.text === 'point')`));
+    assert.equal(await evaluate("!editModeTest.state.showBoxLabels && document.getElementById('boxLabelBtn').getAttribute('aria-pressed') === 'false' && !boxLabelDraws.some(draw => draw.text === 'sample')"), true, "disabled box labels stay disabled when switching images");
+  }
+  await evaluate("boxLabelDraws.length = 0");
+  await click("batchPreviewBtn");
+  await until(() => evaluate("boxLabelDraws.some(draw => draw.canvas === 'batch-preview-overlay' && draw.text === 'point')"));
+  assert.equal(await evaluate("boxLabelDraws.some(draw => draw.canvas === 'batch-preview-overlay' && draw.text === 'sample')"), false, "batch preview also hides box labels");
+  await click("boxLabelBtn");
+  assert.equal(await evaluate("boxLabelDraws.some(draw => draw.canvas === 'batch-preview-overlay' && draw.text === 'sample')"), true, "box labels can be restored in batch preview");
+  await click("batchPreviewBtn");
+  await click("nextImageBtn");
+  await until(() => evaluate("editModeTest.state.currentImageIndex === 1 && document.getElementById('mainImage').complete"));
+  assert.equal(await evaluate("editModeTest.state.showBoxLabels && document.getElementById('boxLabelBtn').getAttribute('aria-pressed') === 'true'"), true, "enabled box labels also survive image switching");
+  await click("prevImageBtn");
+  await until(() => evaluate("editModeTest.state.currentImageIndex === 0 && document.getElementById('mainImage').complete"));
+  await evaluate("CanvasRenderingContext2D.prototype.fillText = originalFillText; delete window.originalFillText; delete window.boxLabelDraws");
   assert.equal(await evaluate("document.getElementById('strokeWidthRange').value"), "2", "stroke width uses the new default");
   assert.equal(await evaluate("document.getElementById('boxFillOpacityRange').value"), "10", "fill opacity uses the new default");
   assert.equal(await evaluate("document.getElementById('labelSizeRange').value"), "12", "label size uses the new default");

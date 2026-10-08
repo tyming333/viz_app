@@ -89,6 +89,7 @@
     labelZoomSizeInput: document.getElementById("labelZoomSizeInput"),
     editModeBtn: document.getElementById("editModeBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
+    boxLabelBtn: document.getElementById("boxLabelBtn"),
     showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
     showContainedBoxesBtn: document.getElementById("showContainedBoxesBtn"),
     fillToggleBtn: document.getElementById("fillToggleBtn"),
@@ -184,6 +185,7 @@
     pendingKeypointPlacement: null,
     editMode: false,
     showBoxes: true,
+    showBoxLabels: true,
     showAllOverlayObjects: false,
     showContainedBoxes: false,
     showBoxFill: true,
@@ -1169,18 +1171,21 @@
         }
         context.stroke();
 
-        const label = labels.length ? labels[0] : "object " + (objectIndex + 1);
-        const minX = Math.min(points[0][0], points[1][0], points[2][0], points[3][0]);
-        const minY = Math.min(points[0][1], points[1][1], points[2][1], points[3][1]);
-        context.font = "700 " + Math.max(8, state.labelFontSize) * inverseScale + "px Microsoft YaHei";
-        context.textBaseline = "alphabetic";
-        context.lineJoin = "round";
-        context.lineWidth = Math.max(1.5, state.labelFontSize * 0.22) * inverseScale;
-        context.strokeStyle = "rgba(0,0,0,0.8)";
-        context.fillStyle = "#ffffff";
-        const labelY = Math.max(16 * inverseScale, minY - 8 * inverseScale);
-        context.strokeText(label, minX, labelY);
-        context.fillText(label, minX, labelY);
+        if (state.showBoxLabels) {
+          const labels = Array.isArray(obj.labels) ? obj.labels : [];
+          const label = labels.length ? labels[0] : "object " + (objectIndex + 1);
+          const minX = Math.min(points[0][0], points[1][0], points[2][0], points[3][0]);
+          const minY = Math.min(points[0][1], points[1][1], points[2][1], points[3][1]);
+          context.font = "700 " + Math.max(8, state.labelFontSize) * inverseScale + "px Microsoft YaHei";
+          context.textBaseline = "alphabetic";
+          context.lineJoin = "round";
+          context.lineWidth = Math.max(1.5, state.labelFontSize * 0.22) * inverseScale;
+          context.strokeStyle = "rgba(0,0,0,0.8)";
+          context.fillStyle = "#ffffff";
+          const labelY = Math.max(16 * inverseScale, minY - 8 * inverseScale);
+          context.strokeText(label, minX, labelY);
+          context.fillText(label, minX, labelY);
+        }
         context.restore();
       }
 
@@ -1512,6 +1517,9 @@
     els.boxVisibilityBtn.classList.toggle("active", state.showBoxes);
     els.boxVisibilityBtn.setAttribute("aria-pressed", String(state.showBoxes));
     els.boxVisibilityBtn.title = state.showBoxes ? "隐藏所有框" : "显示所有框";
+    els.boxLabelBtn.classList.toggle("active", state.showBoxLabels);
+    els.boxLabelBtn.setAttribute("aria-pressed", String(state.showBoxLabels));
+    els.boxLabelBtn.title = state.showBoxLabels ? "隐藏框标签" : "显示框标签";
     els.showAllBoxesBtn.classList.toggle("active", state.showAllOverlayObjects);
     els.showAllBoxesBtn.setAttribute("aria-pressed", String(state.showAllOverlayObjects));
     els.showAllBoxesBtn.textContent = state.showAllOverlayObjects ? "取消显示所有框" : "显示所有框";
@@ -1764,7 +1772,7 @@
   }
 
   function drawLabel(points, label) {
-    if (!label) return;
+    if (!state.showBoxLabels || !label) return;
     const minX = Math.min(points[0][0], points[1][0], points[2][0], points[3][0]);
     const minY = Math.min(points[0][1], points[1][1], points[2][1], points[3][1]);
     overlayContext.save();
@@ -2892,6 +2900,11 @@
   els.fillToggleBtn.addEventListener("click", function onfill() {
     state.showBoxFill = !state.showBoxFill;
     renderFillToggle();
+    renderAnnotationOverlays();
+  });
+  els.boxLabelBtn.addEventListener("click", function onboxlabels() {
+    state.showBoxLabels = !state.showBoxLabels;
+    renderBoxVisibilityToggle();
     renderAnnotationOverlays();
   });
   els.showAllBoxesBtn.addEventListener("click", toggleShowAllBoxes);
