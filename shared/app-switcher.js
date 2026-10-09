@@ -8,10 +8,17 @@
     option.textContent = "YOLO 数据可视化";
     select.add(option, 1);
   }
+  if (!select.querySelector('option[value="attribute-annotator"]')) {
+    const option = document.createElement("option");
+    option.value = "attribute-annotator";
+    option.textContent = "属性标注工具";
+    select.add(option, 2);
+  }
   const appRoot = new URL("../", document.currentScript.src);
   const routes = {
     viewer: "index.html",
     "yolo-viewer": "yolo-viewer/index.html",
+    "attribute-annotator": "attribute-annotator/index.html",
     "field-defect": "field-defect/index.html",
     "model-config": "model-config/index.html"
   };

@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>属性标注工具</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="../shared/app-switcher.css" />
+    <link rel="stylesheet" href="./attributes.css" />
+    <script src="../shared/app-switcher.js" defer></script>
+    <script src="./viewer-core.js" defer></script>
+    <script src="./attributes-core.js" defer></script>
+    <script src="./attributes.js" defer></script>
+    <script src="./app.js" defer></script>
+  </head>
+  <body data-app="attribute-annotator">
+    <svg class="image-filter-definitions" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="imageSharpenFilter" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+          <feConvolveMatrix id="imageSharpenKernel" order="3" kernelMatrix="0 0 0 0 1 0 0 0 0" divisor="1" bias="0" edgeMode="duplicate" preserveAlpha="true" />
+        </filter>
+      </defs>
+    </svg>
+    <header class="topbar">
+      <div class="brand">
+        <h1>
+          <label class="app-switcher">
+            <span class="sr-only">应用</span>
+            <select id="appSwitcher" aria-label="选择应用">
+              <option value="viewer">数据可视化工具</option>
+              <option value="yolo-viewer">YOLO 数据可视化</option>
+              <option value="attribute-annotator">属性标注工具</option>
+              <option value="field-defect">现场缺陷展示</option>
+              <option value="model-config">模型配置</option>
+            </select>
+          </label>
+          <span class="version-label">wanhaoming version 1.0</span>
+        </h1>
+      </div>
+      <div class="actions">
+        <button id="attrsConfigureBtn" type="button">属性配置</button>
+        <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
+        <button id="downloadJsonBtn" type="button" title="导出当前 JSON">导出 JSON</button>
+        <button id="exportSelectedBtn" type="button" title="导出勾选的图片和 JSON">选择导出</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel import-panel">
+          <label class="field">
+            <span>图片 prefix</span>
+            <input id="prefixInput" type="text" placeholder="例如: D:/dataset/images/ 或 //服务器/共享目录/" title="支持盘符路径、file:// 路径和 Windows UNC 共享路径，例如 //172.20.7.10/共享目录/" />
+          </label>
+          <label class="field">
+            <span>导入 JSON 文件</span>
+            <div class="file-picker">
+              <input id="jsonFileInput" type="file" accept=".json,application/json" aria-label="导入 JSON 文件" />
+              <span class="file-picker-button" aria-hidden="true">选择文件</span>
+              <span id="jsonFileNameText" class="file-picker-name" title="未选择文件" aria-hidden="true">未选择文件</span>
+            </div>
+          </label>
+          <!-- 保留隐藏的数据载体，供文件导入、解析和导出流程使用；不在左侧显示 JSON 文本框。 -->
+          <input id="jsonInput" type="hidden" />
+          <div class="progress" aria-hidden="true">
+            <div id="progressBar"></div>
+          </div>
+          <p id="statusText" class="status">等待输入</p>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-title">
+            <strong>图片</strong>
+          </div>
+          <div id="batchProgressPanel" class="batch-progress-panel" hidden>
+            <div class="batch-progress-title">
+              <span>批量预览位置</span>
+              <output id="batchProgressText">0 / 0</output>
+            </div>
+            <input id="batchProgressRange" type="range" min="0" max="0" step="1" value="0" aria-label="批量预览位置" />
+          </div>
+          <div class="filter-layout">
+            <div class="filter-stack">
+              <div class="filter-text-row">
+              <input id="imageFilter" type="search" placeholder="筛选图片名" />
+              <div id="labelFilterCombobox" class="label-filter-combobox">
+                <div id="labelFilterField" class="label-filter-field">
+                  <div id="labelFilterSelections" class="label-filter-selections"></div>
+                  <input id="labelFilter" type="search" placeholder="筛选 labels" role="combobox"
+                    aria-label="筛选 labels 或选择多个 labels" aria-autocomplete="list"
+                    aria-controls="labelFilterMenu" aria-expanded="false" />
+                </div>
+                <div id="labelFilterMenu" class="label-multiselect-menu label-filter-menu" role="listbox"
+                  aria-label="匹配的 labels" aria-multiselectable="true" hidden></div>
+              </div>
+              </div>
+              <div id="labelSelect" class="label-multiselect is-disabled">
+                <button id="labelSelectButton" class="label-multiselect-trigger" type="button"
+                  aria-label="从当前 JSON 的全部 labels 中选择" aria-haspopup="listbox" aria-expanded="false" disabled>
+                  <span id="labelSelectText">全部 labels</span>
+                </button>
+                <div id="labelSelectMenu" class="label-multiselect-menu" role="listbox"
+                  aria-label="labels 多选列表" aria-multiselectable="true" hidden></div>
+              </div>
+            <div class="filter-range-grid">
+              <label class="range-field">
+                <span>宽度</span>
+                <div class="range-inputs">
+                  <input id="widthMinFilter" type="number" min="0" step="1" placeholder="min" />
+                  <input id="widthMaxFilter" type="number" min="0" step="1" placeholder="max" />
+                </div>
+              </label>
+              <label class="range-field">
+                <span>高度</span>
+                <div class="range-inputs">
+                  <input id="heightMinFilter" type="number" min="0" step="1" placeholder="min" />
+                  <input id="heightMaxFilter" type="number" min="0" step="1" placeholder="max" />
+                </div>
+              </label>
+            </div>
+              <div class="filter-note">
+                <span id="knownSizeText" title="宽高筛选基于已知图像尺寸 0/0">尺寸已知 0/0</span>
+                <div class="filter-actions">
+                  <button id="applyFiltersBtn" type="button">确定</button>
+                  <button id="clearFiltersBtn" type="button">清空</button>
+                  <span id="imageCount" aria-label="筛选结果数量">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+          <div id="imageList" class="virtual-list" aria-label="image list"></div>
+        </section>
+      </aside>
+
+      <section class="viewer">
+        <div class="viewer-toolbar">
+          <label class="image-picker">
+            <span>当前图片</span>
+            <div class="image-picker-controls">
+              <input id="currentImageText" type="text" readonly value="" title="可选中复制当前图片名" />
+              <output id="imageIndexText" title="当前图片序号">-</output>
+            </div>
+          </label>
+          <div class="toolbar-actions">
+            <label class="batch-size-control" title="输入每行和每列显示的图片数量，范围 2 到 10">
+              <span>批量 N</span>
+              <input id="batchGridSizeInput" type="number" min="2" max="10" step="1" value="3" inputmode="numeric" aria-label="批量预览每行每列图片数" />
+            </label>
+            <button id="batchPreviewBtn" type="button" aria-pressed="false">批量预览</button>
+            <button id="resetViewBtn" type="button">复位</button>
+            <button id="labelZoomBtn" type="button" aria-pressed="false" title="开启按标签缩放">标签缩放</button>
+            <label class="label-zoom-size-control" title="标签外接矩形的最小宽高">
+              <span>最小框</span>
+              <input id="labelZoomSizeInput" type="number" min="64" max="8192" step="64" value="1024" inputmode="numeric" aria-label="标签缩放最小框宽高" />
+              <span>px</span>
+            </label>
+            <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
+            <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
+            <button id="boxLabelBtn" type="button" aria-pressed="true" title="隐藏框标签">框标签</button>
+            <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
+            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
+            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
+            <button id="showAllBoxesBtn" type="button">显示所有框</button>
+            <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
+          </div>
+
+          <div class="image-adjustments" role="group" aria-label="图像调整">
+            <div class="annotation-style-controls" role="group" aria-label="标注样式">
+              <label class="toolbar-slider" title="框线基础粗细">
+                <button id="strokeWidthReset" class="toolbar-reset" type="button" title="恢复默认框粗细">框粗细</button>
+                <input id="strokeWidthRange" type="range" min="0.5" max="12" step="0.5" value="2" />
+                <output id="strokeWidthText">2</output>
+              </label>
+              <label class="toolbar-slider" title="框填充不透明度">
+                <button id="boxFillOpacityReset" class="toolbar-reset" type="button" title="恢复默认填充不透明度">填充</button>
+                <input id="boxFillOpacityRange" type="range" min="0" max="100" step="1" value="10" />
+                <output id="boxFillOpacityText">10%</output>
+              </label>
+              <label class="toolbar-slider" title="标签字体基础大小">
+                <button id="labelSizeReset" class="toolbar-reset" type="button" title="恢复默认字体大小">字体</button>
+                <input id="labelSizeRange" type="range" min="8" max="28" step="1" value="12" />
+                <output id="labelSizeText">12</output>
+              </label>
+            </div>
+            <div class="adjustment-pair">
+              <div class="toolbar-slider">
+                <button id="resetBrightnessBtn" class="toolbar-reset" type="button" title="复位亮度为 100%">亮度</button>
+                <input id="brightnessRange" type="range" min="0" max="600" step="1" value="100" aria-label="底图亮度" />
+                <output id="brightnessText">100%</output>
+              </div>
+              <div class="toolbar-slider">
+                <button id="resetContrastBtn" class="toolbar-reset" type="button" title="复位对比度为 100%">对比度</button>
+                <input id="contrastRange" type="range" min="0" max="600" step="1" value="100" aria-label="底图对比度" />
+                <output id="contrastText">100%</output>
+              </div>
+            </div>
+            <div class="toolbar-slider">
+              <button id="resetSaturationBtn" class="toolbar-reset" type="button" title="复位饱和度为 100%">饱和度</button>
+              <input id="saturationRange" type="range" min="0" max="200" step="1" value="100" aria-label="底图饱和度" />
+              <output id="saturationText">100%</output>
+            </div>
+            <div class="toolbar-slider">
+              <button id="resetGrayscaleBtn" class="toolbar-reset" type="button" title="复位灰度为 0%">灰度</button>
+              <input id="grayscaleRange" type="range" min="0" max="100" step="1" value="0" aria-label="底图灰度" />
+              <output id="grayscaleText">0%</output>
+            </div>
+            <div class="toolbar-slider">
+              <button id="resetSharpnessBtn" class="toolbar-reset" type="button" title="关闭锐化；增强边缘仅供观察，可能放大噪声">锐化</button>
+              <input id="sharpnessRange" type="range" min="0" max="100" step="1" value="0" aria-label="底图锐化" />
+              <output id="sharpnessText">0%</output>
+            </div>
+            <button id="resetImageAdjustmentsBtn" type="button" title="恢复所有图像调整参数，不改变缩放和标注">全部复位</button>
+          </div>
+
+        </div>
+
+        <div class="attribute-workspace">
+        <div id="canvasShell" class="canvas-shell">
+          <div id="stage" class="stage">
+            <img id="mainImage" alt="" />
+          </div>
+          <div id="batchPreviewGrid" class="batch-preview-grid" aria-label="批量图片预览" hidden></div>
+          <canvas id="overlayCanvas" aria-label="objects overlay"></canvas>
+          <div id="emptyState" class="empty-state">
+            <strong>未加载数据</strong>
+            <span>输入 prefix 和 JSON 后开始查看 objects 框。</span>
+          </div>
+          <button id="prevImageBtn" class="image-nav image-nav-prev" type="button" aria-label="上一张">&lsaquo;</button>
+          <button id="nextImageBtn" class="image-nav image-nav-next" type="button" aria-label="下一张">&rsaquo;</button>
+          <div class="image-info" aria-live="polite" aria-label="当前图片信息">
+            <span>序号: <output id="imageInfoIndex">-</output></span>
+            <span>宽高: <output id="imageInfoSize">-</output></span>
+            <span>Objects: <output id="imageInfoObjects">0</output></span>
+            <span>缩放: <output id="imageInfoZoom">100%</output></span>
+            <span>创建时间: <output id="imageInfoCreated">-</output></span>
+          </div>
+        </div>
+        <aside class="attribute-panel" aria-label="属性状态选择">
+          <div class="panel-title"><strong>属性状态</strong><span id="attrsProgress">未配置</span></div>
+          <p id="attrsTarget" class="attribute-target" aria-live="polite">请先配置属性选择表</p>
+          <label class="field"><span>当前标注框</span><select id="attrsObjectSelect" aria-label="当前标注框"></select></label>
+          <div id="attrsChoices" class="attribute-choices"></div>
+          <button id="attrsUndoBtn" type="button" disabled>撤销上一步</button>
+          <p id="attrsMessage" class="attribute-message" role="status"></p>
+        </aside>
+        </div>
+      </section>
+
+      <aside class="inspector">
+        <section class="panel list-panel">
+          <div class="panel-title">
+            <strong>Objects</strong>
+            <span id="objectCount">0</span>
+          </div>
+          <div class="row">
+            <button id="addRectangleBtn" type="button">新增矩形框</button>
+            <button id="addQuadrilateralBtn" type="button">新增四点框</button>
+            <button id="deleteObjectBtn" type="button">删除选中</button>
+          </div>
+          <div id="objectList" class="virtual-list" aria-label="object list"></div>
+        </section>
+
+        <section class="panel editor-panel">
+          <div class="panel-title">
+            <strong>编辑</strong>
+            <span id="selectedBadge">未选中</span>
+          </div>
+          <div class="bbox-summary">
+            <span>外接矩形</span>
+            <output id="bboxSizeText">未选中</output>
+          </div>
+          <label class="field">
+            <span>labels, 每行一个</span>
+            <textarea id="labelsEditor" spellcheck="false"></textarea>
+          </label>
+          <div class="bbox-grid" id="bboxGrid"></div>
+          <div class="keypoint-editor">
+            <div class="keypoint-editor-title">
+              <span>关键点</span>
+              <button id="addKeypointBtn" type="button">新增点</button>
+            </div>
+            <div id="keypointList" class="keypoint-list" aria-label="keypoint editor"></div>
+          </div>
+          <button id="applyObjectBtn" type="button">应用修改</button>
+        </section>
+      </aside>
+    </main>
+    <dialog id="attrsConfigDialog" aria-labelledby="attrsConfigTitle">
+      <div class="config-heading"><h2 id="attrsConfigTitle">配置属性选择表</h2><button id="attrsConfigClose" type="button" aria-label="关闭配置">关闭</button></div>
+      <p>每组属性只能选择一个状态。先填写或导入属性选择表，再开始标注。</p>
+      <div class="config-actions">
+        <button id="attrsImportBtn" type="button">导入配置</button>
+        <button id="attrsExportBtn" type="button">导出配置</button>
+        <input id="attrsConfigFile" type="file" accept=".json,application/json" hidden />
+        <button id="attrsAddBtn" type="button">新增属性</button>
+      </div>
+      <div id="attrsConfigRows" class="config-rows"></div>
+      <p id="attrsConfigError" role="alert"></p>
+      <div class="config-footer"><button id="attrsApplyBtn" type="button">应用配置，开始标注</button></div>
+    </dialog>
+  </body>
+</html>
