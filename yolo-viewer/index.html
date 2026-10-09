@@ -3,14 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>数据可视化工具</title>
+    <title>YOLO 数据可视化</title>
     <link rel="stylesheet" href="./styles.css" />
-    <link rel="stylesheet" href="./shared/app-switcher.css" />
-    <script src="./shared/app-switcher.js" defer></script>
+    <link rel="stylesheet" href="../shared/app-switcher.css" />
+    <script src="../shared/app-switcher.js" defer></script>
+    <script src="./vendor/js-yaml.min.js" defer></script>
+    <script src="./vendor/fflate.js" defer></script>
+    <script src="./yolo-core.js" defer></script>
     <script src="./viewer-core.js" defer></script>
     <script src="./app.js" defer></script>
+    <script src="./yolo-import.js" defer></script>
   </head>
-  <body data-app="viewer">
+  <body data-app="yolo-viewer">
     <svg class="image-filter-definitions" width="0" height="0" aria-hidden="true" focusable="false">
       <defs>
         <filter id="imageSharpenFilter" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
@@ -34,33 +38,43 @@
         </h1>
       </div>
       <div class="actions">
-        <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
-        <button id="downloadJsonBtn" type="button" title="导出当前 JSON">导出 JSON</button>
-        <button id="exportSelectedBtn" type="button" title="导出勾选的图片和 JSON">选择导出</button>
+        <button id="copyJsonBtn" type="button" hidden>复制</button>
+        <button id="downloadJsonBtn" type="button" title="导出全部图片、YOLO TXT 和标签映射">导出 YOLO</button>
+        <button id="exportSelectedBtn" type="button" title="导出勾选的图片、YOLO TXT 和标签映射">选择导出</button>
       </div>
     </header>
 
     <main class="layout">
       <aside class="sidebar">
         <section class="panel import-panel">
+          <input id="prefixInput" type="hidden" />
+          <input id="jsonFileInput" type="file" hidden />
+          <span id="jsonFileNameText" hidden></span>
           <label class="field">
-            <span>图片 prefix</span>
-            <input id="prefixInput" type="text" placeholder="例如: D:/dataset/images/ 或 //服务器/共享目录/" title="支持盘符路径、file:// 路径和 Windows UNC 共享路径，例如 //172.20.7.10/共享目录/" />
-          </label>
-          <label class="field">
-            <span>导入 JSON 文件</span>
+            <span>数据文件夹</span>
             <div class="file-picker">
-              <input id="jsonFileInput" type="file" accept=".json,application/json" aria-label="导入 JSON 文件" />
-              <span class="file-picker-button" aria-hidden="true">选择文件</span>
-              <span id="jsonFileNameText" class="file-picker-name" title="未选择文件" aria-hidden="true">未选择文件</span>
+              <input id="yoloDirectoryInput" type="file" webkitdirectory multiple aria-label="选择 YOLO 数据文件夹" />
+              <span class="file-picker-button" aria-hidden="true">选择文件夹</span>
+              <span id="yoloDirectoryName" class="file-picker-name" aria-hidden="true">未选择文件夹</span>
             </div>
           </label>
+          <label class="field">
+            <span>标签映射</span>
+            <div class="file-picker">
+              <input id="yoloMappingInput" type="file" accept=".json,.yaml,.yml,.txt,.names" aria-label="选择标签映射" />
+              <span class="file-picker-button" aria-hidden="true">选择文件</span>
+              <span id="yoloMappingName" class="file-picker-name" aria-hidden="true">自动识别</span>
+            </div>
+          </label>
+          <label class="yolo-option"><input id="yoloMissingAsNegative" type="checkbox" />缺少 TXT 作为负样本</label>
+          <button id="yoloLoadBtn" type="button" disabled>加载数据</button>
           <!-- 保留隐藏的数据载体，供文件导入、解析和导出流程使用；不在左侧显示 JSON 文本框。 -->
           <input id="jsonInput" type="hidden" />
           <div class="progress" aria-hidden="true">
             <div id="progressBar"></div>
           </div>
           <p id="statusText" class="status">等待输入</p>
+          <details id="yoloIssues" hidden><summary id="yoloIssuesSummary">数据问题</summary><ul id="yoloIssuesList"></ul></details>
         </section>
 
         <section class="panel list-panel">
@@ -91,7 +105,7 @@
               </div>
               <div id="labelSelect" class="label-multiselect is-disabled">
                 <button id="labelSelectButton" class="label-multiselect-trigger" type="button"
-                  aria-label="从当前 JSON 的全部 labels 中选择" aria-haspopup="listbox" aria-expanded="false" disabled>
+                  aria-label="从当前数据的全部 labels 中选择" aria-haspopup="listbox" aria-expanded="false" disabled>
                   <span id="labelSelectText">全部 labels</span>
                 </button>
                 <div id="labelSelectMenu" class="label-multiselect-menu" role="listbox"
@@ -154,8 +168,8 @@
             <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
             <button id="boxLabelBtn" type="button" aria-pressed="true" title="隐藏框标签">框标签</button>
             <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
-            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
-            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
+            <button id="keypointVisibilityBtn" type="button" aria-pressed="true" hidden>显示点</button>
+            <button id="keypointLabelBtn" type="button" aria-pressed="true" hidden>点标签</button>
             <button id="showAllBoxesBtn" type="button">显示所有框</button>
             <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
           </div>
@@ -218,7 +232,7 @@
           <canvas id="overlayCanvas" aria-label="objects overlay"></canvas>
           <div id="emptyState" class="empty-state">
             <strong>未加载数据</strong>
-            <span>输入 prefix 和 JSON 后开始查看 objects 框。</span>
+            <span>尚未加载 YOLO 数据</span>
           </div>
           <button id="prevImageBtn" class="image-nav image-nav-prev" type="button" aria-label="上一张">&lsaquo;</button>
           <button id="nextImageBtn" class="image-nav image-nav-next" type="button" aria-label="下一张">&rsaquo;</button>
@@ -240,7 +254,7 @@
           </div>
           <div class="row">
             <button id="addRectangleBtn" type="button">新增矩形框</button>
-            <button id="addQuadrilateralBtn" type="button">新增四点框</button>
+            <button id="addQuadrilateralBtn" type="button" hidden>新增四点框</button>
             <button id="deleteObjectBtn" type="button">删除选中</button>
           </div>
           <div id="objectList" class="virtual-list" aria-label="object list"></div>
@@ -256,11 +270,11 @@
             <output id="bboxSizeText">未选中</output>
           </div>
           <label class="field">
-            <span>labels, 每行一个</span>
-            <textarea id="labelsEditor" spellcheck="false"></textarea>
+            <span>标签</span>
+            <select id="labelsEditor" aria-label="标注类别"></select>
           </label>
           <div class="bbox-grid" id="bboxGrid"></div>
-          <div class="keypoint-editor">
+          <div class="keypoint-editor" hidden>
             <div class="keypoint-editor-title">
               <span>关键点</span>
               <button id="addKeypointBtn" type="button">新增点</button>
