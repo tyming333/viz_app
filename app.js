@@ -89,6 +89,7 @@
     labelZoomSizeInput: document.getElementById("labelZoomSizeInput"),
     editModeBtn: document.getElementById("editModeBtn"),
     boxVisibilityBtn: document.getElementById("boxVisibilityBtn"),
+    imageAdjustments: document.querySelector(".image-adjustments"),
     boxLabelBtn: document.getElementById("boxLabelBtn"),
     showAllBoxesBtn: document.getElementById("showAllBoxesBtn"),
     showContainedBoxesBtn: document.getElementById("showContainedBoxesBtn"),
@@ -2962,6 +2963,52 @@
       state[control.stateKey] = control.defaultValue;
       renderSliderValues();
       applyImageAdjustments();
+    });
+  });
+  els.imageAdjustments.querySelectorAll('input[type="range"]').forEach(function bindFineRangeDrag(input) {
+    input.addEventListener("pointerdown", function onRangePointerDown(event) {
+      if (event.button !== 0 || !event.isPrimary) return;
+      event.preventDefault();
+      input.focus();
+      input.setPointerCapture(event.pointerId);
+      const startX = event.clientX;
+      const startValue = Number(input.value);
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const step = Number(input.step);
+      const bounds = input.getBoundingClientRect();
+      const thumbRadius = 3;
+      const trackWidth = bounds.width - thumbRadius * 2;
+      const thumbX = bounds.left + thumbRadius + (startValue - min) / (max - min) * trackWidth;
+      const startedOnThumb = Math.abs(startX - thumbX) <= thumbRadius;
+      let dragged = false;
+
+      function setValue(value) {
+        const bounded = Math.max(min, Math.min(max, value));
+        const snapped = Math.min(max, min + Math.round((bounded - min) / step) * step);
+        if (Number(input.value) === snapped) return;
+        input.value = String(snapped);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+
+      function onPointerMove(moveEvent) {
+        const distance = moveEvent.clientX - startX;
+        if (Math.abs(distance) >= 3) dragged = true;
+        // Keep fine adjustment independent of the slider's width and full range.
+        if (dragged) setValue(startValue + Math.round(distance / 3) * step);
+      }
+
+      function onPointerEnd(endEvent) {
+        input.removeEventListener("pointermove", onPointerMove);
+        input.removeEventListener("pointerup", onPointerEnd);
+        input.removeEventListener("pointercancel", onPointerEnd);
+        if (endEvent.type !== "pointerup" || dragged || startedOnThumb) return;
+        setValue(min + (max - min) * Math.max(0, Math.min(1, (endEvent.clientX - bounds.left - thumbRadius) / trackWidth)));
+      }
+
+      input.addEventListener("pointermove", onPointerMove);
+      input.addEventListener("pointerup", onPointerEnd);
+      input.addEventListener("pointercancel", onPointerEnd);
     });
   });
   document.getElementById("resetImageAdjustmentsBtn").addEventListener("click", function resetImageAdjustments() {

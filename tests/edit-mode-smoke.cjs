@@ -69,6 +69,12 @@ const server = http.createServer((req, res) => {
     await pause(40);
   };
   const key = key => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', {key:${JSON.stringify(key)}, ctrlKey:${key === "z"}}))`);
+  const fineDrag = async id => {
+    const point = await evaluate(`(() => { const r=document.getElementById('${id}').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+    await call("Input.dispatchMouseEvent", { type: "mousePressed", ...point, button: "left", clickCount: 1 });
+    await call("Input.dispatchMouseEvent", { type: "mouseMoved", x: point.x + 6, y: point.y, button: "left", buttons: 1 });
+    await call("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x + 6, y: point.y, button: "left", clickCount: 1 });
+  };
   await call("Page.enable");
   await call("Runtime.enable");
   await call("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -84,6 +90,24 @@ const server = http.createServer((req, res) => {
     editModeTest.loadJsonOnMainThread(JSON.stringify(data));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
+  assert.equal(await evaluate("document.getElementById('brightnessRange').step"), "1", "image adjustment sliders accept one-percent changes");
+  await fineDrag("brightnessRange");
+  assert.equal(await evaluate("editModeTest.state.imageBrightness"), 102, "short drags change brightness by two percent");
+  const thumb = await evaluate(`(() => { const input=document.getElementById('brightnessRange'), r=input.getBoundingClientRect(); return {x:r.left+3+(Number(input.value)-Number(input.min))/(Number(input.max)-Number(input.min))*(r.width-6),y:r.top+r.height/2}; })()`);
+  await call("Input.dispatchMouseEvent", { type: "mousePressed", ...thumb, button: "left", clickCount: 1 });
+  await call("Input.dispatchMouseEvent", { type: "mouseReleased", ...thumb, button: "left", clickCount: 1 });
+  assert.equal(await evaluate("editModeTest.state.imageBrightness"), 102, "clicking the thumb preserves its value");
+  await call("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+  await call("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+  assert.equal(await evaluate("editModeTest.state.imageBrightness"), 103, "arrow keys retain one-percent adjustment");
+  const track = await evaluate(`(() => { const r=document.getElementById('brightnessRange').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
+  await call("Input.dispatchMouseEvent", { type: "mousePressed", ...track, button: "left", clickCount: 1 });
+  await call("Input.dispatchMouseEvent", { type: "mouseReleased", ...track, button: "left", clickCount: 1 });
+  assert.equal(await evaluate("editModeTest.state.imageBrightness"), 300, "clicking the track retains quick positioning");
+  await click("resetBrightnessBtn");
+  await fineDrag("boxFillOpacityRange");
+  assert.equal(await evaluate("editModeTest.state.boxFillOpacity"), 12, "short drags change box fill by two percent");
+  await click("boxFillOpacityReset");
   await evaluate(`(() => {
     window.boxLabelDraws = [];
     window.originalFillText = CanvasRenderingContext2D.prototype.fillText;
@@ -94,9 +118,11 @@ const server = http.createServer((req, res) => {
   })()`);
   assert.equal(await evaluate("document.getElementById('boxLabelBtn').getAttribute('aria-pressed')"), "true", "box labels are enabled by default");
   await click("strokeWidthReset");
+  await until(() => evaluate("boxLabelDraws.some(draw => draw.canvas === 'overlayCanvas' && draw.text === 'sample')"));
   assert.equal(await evaluate("boxLabelDraws.some(draw => draw.canvas === 'overlayCanvas' && draw.text === 'sample')"), true, "single image draws box labels by default");
   await evaluate("boxLabelDraws.length = 0");
   await click("boxLabelBtn");
+  await until(() => evaluate("boxLabelDraws.some(draw => draw.text === 'point')"));
   assert.equal(await evaluate("boxLabelDraws.some(draw => draw.text === 'sample')"), false, "turning off box labels suppresses their drawing");
   assert.equal(await evaluate("boxLabelDraws.some(draw => draw.text === 'point') && editModeTest.state.showBoxes"), true, "box visibility and keypoint labels remain enabled");
   for (const [button, index] of [["nextImageBtn", 1], ["prevImageBtn", 0]]) {

@@ -149,6 +149,17 @@
               <input id="labelZoomSizeInput" type="number" min="64" max="8192" step="64" value="1024" inputmode="numeric" aria-label="标签缩放最小框宽高" />
               <span>px</span>
             </label>
+            <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
+            <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
+            <button id="boxLabelBtn" type="button" aria-pressed="true" title="隐藏框标签">框标签</button>
+            <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
+            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
+            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
+            <button id="showAllBoxesBtn" type="button">显示所有框</button>
+            <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
+          </div>
+
+          <div class="image-adjustments" role="group" aria-label="图像调整">
             <div class="annotation-style-controls" role="group" aria-label="标注样式">
               <label class="toolbar-slider" title="框线基础粗细">
                 <button id="strokeWidthReset" class="toolbar-reset" type="button" title="恢复默认框粗细">框粗细</button>
@@ -166,42 +177,31 @@
                 <output id="labelSizeText">12</output>
               </label>
             </div>
-            <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
-            <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
-            <button id="boxLabelBtn" type="button" aria-pressed="true" title="隐藏框标签">框标签</button>
-            <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
-            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
-            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
-            <button id="showAllBoxesBtn" type="button">显示所有框</button>
-            <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
-          </div>
-
-          <div class="image-adjustments" role="group" aria-label="图像调整">
             <div class="adjustment-pair">
               <div class="toolbar-slider">
                 <button id="resetBrightnessBtn" class="toolbar-reset" type="button" title="复位亮度为 100%">亮度</button>
-                <input id="brightnessRange" type="range" min="0" max="600" step="5" value="100" aria-label="底图亮度" />
+                <input id="brightnessRange" type="range" min="0" max="600" step="1" value="100" aria-label="底图亮度" />
                 <output id="brightnessText">100%</output>
               </div>
               <div class="toolbar-slider">
                 <button id="resetContrastBtn" class="toolbar-reset" type="button" title="复位对比度为 100%">对比度</button>
-                <input id="contrastRange" type="range" min="0" max="600" step="5" value="100" aria-label="底图对比度" />
+                <input id="contrastRange" type="range" min="0" max="600" step="1" value="100" aria-label="底图对比度" />
                 <output id="contrastText">100%</output>
               </div>
             </div>
             <div class="toolbar-slider">
               <button id="resetSaturationBtn" class="toolbar-reset" type="button" title="复位饱和度为 100%">饱和度</button>
-              <input id="saturationRange" type="range" min="0" max="200" step="5" value="100" aria-label="底图饱和度" />
+              <input id="saturationRange" type="range" min="0" max="200" step="1" value="100" aria-label="底图饱和度" />
               <output id="saturationText">100%</output>
             </div>
             <div class="toolbar-slider">
               <button id="resetGrayscaleBtn" class="toolbar-reset" type="button" title="复位灰度为 0%">灰度</button>
-              <input id="grayscaleRange" type="range" min="0" max="100" step="5" value="0" aria-label="底图灰度" />
+              <input id="grayscaleRange" type="range" min="0" max="100" step="1" value="0" aria-label="底图灰度" />
               <output id="grayscaleText">0%</output>
             </div>
             <div class="toolbar-slider">
               <button id="resetSharpnessBtn" class="toolbar-reset" type="button" title="关闭锐化；增强边缘仅供观察，可能放大噪声">锐化</button>
-              <input id="sharpnessRange" type="range" min="0" max="100" step="5" value="0" aria-label="底图锐化" />
+              <input id="sharpnessRange" type="range" min="0" max="100" step="1" value="0" aria-label="底图锐化" />
               <output id="sharpnessText">0%</output>
             </div>
             <button id="resetImageAdjustmentsBtn" type="button" title="恢复所有图像调整参数，不改变缩放和标注">全部复位</button>

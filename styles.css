@@ -185,8 +185,8 @@ textarea {
 }
 
 .annotation-style-controls input[type="range"] {
-  flex: 0 0 42px;
-  width: 42px;
+  flex: 0 0 84px;
+  width: 84px;
   min-width: 0;
 }
 
@@ -855,6 +855,7 @@ textarea {
   appearance: none;
   width: 70px;
   height: 18px;
+  touch-action: none;
   padding: 0;
   cursor: pointer;
   border: 0;
@@ -871,9 +872,9 @@ textarea {
 
 .toolbar-slider input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 8px;
-  height: 8px;
-  margin-top: -2.5px;
+  width: 6px;
+  height: 6px;
+  margin-top: -1.5px;
   border: 0;
   border-radius: 50%;
   background: var(--accent);
@@ -886,22 +887,11 @@ textarea {
 }
 
 .toolbar-slider input[type="range"]::-moz-range-thumb {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border: 0;
   border-radius: 50%;
   background: var(--accent);
-}
-
-.annotation-style-controls input[type="range"]::-webkit-slider-thumb {
-  width: 7px;
-  height: 7px;
-  margin-top: -2px;
-}
-
-.annotation-style-controls input[type="range"]::-moz-range-thumb {
-  width: 7px;
-  height: 7px;
 }
 
 .toolbar-slider input[type="range"]:focus-visible {
@@ -1589,6 +1579,19 @@ textarea {
 }
 
 @media (max-width: 640px) {
+  .annotation-style-controls {
+    width: 100%;
+  }
+
+  .annotation-style-controls .toolbar-slider {
+    flex: 1 1 0;
+  }
+
+  .annotation-style-controls input[type="range"] {
+    flex: 1 1 auto;
+    width: auto;
+  }
+
   .topbar {
     height: auto;
     min-height: 42px;
