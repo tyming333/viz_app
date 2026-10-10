@@ -29,16 +29,19 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   color: var(--text);
+  display: none;
 }
+#attrsConfigDialog[open] { display: flex; flex-direction: column; }
 #attrsConfigDialog::backdrop { background: rgba(23, 32, 42, .35); }
 .config-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .config-heading h2 { font-size: var(--font-title); margin: 0; }
 .config-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
-.config-rows { display: grid; gap: 12px; }
-.config-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; }
+.config-rows { display: grid; gap: 12px; overflow-y: auto; min-height: 0; }
+.config-heading, .config-actions, .config-footer { flex-shrink: 0; }
+.config-row { display: grid; grid-template-columns: minmax(140px, 1fr) minmax(0, 2fr) auto; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; align-items: start; }
 .config-row .field { margin: 0; min-width: 0; }
-.config-row .config-options { grid-column: 1 / -1; }
-.config-row textarea { min-height: 80px; }
+.config-row textarea { min-height: 54px; height: 54px; padding: 6px 10px; }
+.config-row > button { margin-top: 20px; }
 .config-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
 #attrsApplyBtn { background: var(--accent); color: white; }
 @media (max-width: 1180px) {

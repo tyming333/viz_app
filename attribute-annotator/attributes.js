@@ -18,17 +18,17 @@
     row.className = "config-row";
     name.dataset.configField = "name";
     name.value = group ? group.name : "";
-    name.placeholder = "例如：外观状态";
+    name.placeholder = "例如：螺母数量";
     options.dataset.configField = "options";
-    options.value = group ? group.options.join("\n") : "";
-    options.placeholder = "正常\n松动\n缺失";
+    options.value = group ? group.options.join("、") : "";
+    options.placeholder = "明确可辨、存疑、不可辨";
     options.spellcheck = false;
-    const optionsField = field("可选属性名，每行一个（同组单选）", options);
+    const optionsField = field("可选状态（用顿号、逗号或换行分隔）", options);
     optionsField.classList.add("config-options");
     remove.type = "button";
-    remove.textContent = "删除组";
+    remove.textContent = "删除";
     remove.addEventListener("click", () => row.remove());
-    row.append(field("属性组名称", name), remove, optionsField);
+    row.append(field("属性词条", name), optionsField, remove);
     rows.append(row);
   }
   function fillRows(value) {
@@ -39,15 +39,15 @@
   function readRows() {
     return core.normalizeConfig({ version: 1, groups: Array.from(rows.children, row => ({
       name: row.querySelector('[data-config-field="name"]').value,
-      options: row.querySelector('[data-config-field="options"]').value.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
+      options: row.querySelector('[data-config-field="options"]').value.split(/[、,，\r\n]+/).map(value => value.trim()).filter(Boolean)
     })) });
   }
   function openConfig() {
-    fillRows(config);
+    fillRows(config || core.defaultConfig());
     if (!dialog.open) dialog.showModal();
   }
   function downloadConfig(value) {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }));
+    const url = URL.createObjectURL(new Blob([JSON.stringify(core.exportConfig(value), null, 2)], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
     link.download = "attrs-selection-table.json";
@@ -70,7 +70,7 @@
       viewer.recordUndo();
       obj.score_attrs = next;
       render();
-      message(option === null ? "已清空该组属性" : "已保存：" + option);
+      message(option === null ? "已清空：" + group.name : "已保存：" + group.name + "：" + option);
     } catch (error) { message(error.message, true); }
   }
   function render() {
@@ -96,13 +96,14 @@
     choices.replaceChildren();
     message("");
     if (!config) { byId("attrsProgress").textContent = "未配置"; return; }
-    let selected = [], valid = true;
-    try { selected = obj ? core.read(obj.score_attrs) : []; }
+    let selected = {}, valid = true;
+    try { selected = obj ? core.read(obj.score_attrs) : {}; }
     catch (error) { valid = false; message(error.message, true); }
     let completed = 0;
     config.groups.forEach(group => {
-      const groupValues = selected.filter(value => group.options.includes(value));
-      if (groupValues.length === 1) completed += 1;
+      const hasValue = Object.prototype.hasOwnProperty.call(selected, group.name);
+      const selectedValue = hasValue ? selected[group.name] : undefined;
+      if (hasValue && group.options.includes(selectedValue)) completed += 1;
       const box = document.createElement("fieldset"), legend = document.createElement("legend"), buttons = document.createElement("div");
       box.className = "attribute-group";
       legend.textContent = group.name;
@@ -114,7 +115,8 @@
         button.type = "button";
         button.textContent = value;
         button.dataset.attributeOption = value;
-        button.setAttribute("aria-pressed", String(groupValues.includes(value)));
+        button.dataset.attributeKey = group.name;
+        button.setAttribute("aria-pressed", String(selectedValue === value));
         button.disabled = !obj || !valid || viewer.batchPreview();
         button.addEventListener("click", () => choose(group, value));
         buttons.append(button);
@@ -122,13 +124,14 @@
       const clear = document.createElement("button");
       clear.type = "button";
       clear.className = "attribute-clear";
-      clear.textContent = "清空该组";
-      clear.disabled = !obj || !valid || !groupValues.length || viewer.batchPreview();
+      clear.textContent = "清空该项";
+      clear.dataset.attributeClear = group.name;
+      clear.disabled = !obj || !valid || !hasValue || viewer.batchPreview();
       clear.addEventListener("click", () => choose(group, null));
       box.append(legend, buttons, clear);
-      if (groupValues.length > 1) {
+      if (hasValue && !group.options.includes(selectedValue)) {
         const warning = document.createElement("p");
-        warning.textContent = "已有多个同组属性，请选择一个状态修正。";
+        warning.textContent = "已有状态“" + selectedValue + "”不在当前配置中，选择新状态可替换。";
         box.append(warning);
       }
       choices.append(box);
@@ -140,6 +143,7 @@
   rows.addEventListener("input", () => { byId("attrsConfigError").textContent = ""; });
   byId("attrsConfigClose").addEventListener("click", () => dialog.close());
   byId("attrsAddBtn").addEventListener("click", () => addRow());
+  byId("attrsPresetBtn").addEventListener("click", () => fillRows(core.defaultConfig()));
   byId("attrsApplyBtn").addEventListener("click", () => {
     try { config = readRows(); dialog.close(); render(); }
     catch (error) { showError(error); }

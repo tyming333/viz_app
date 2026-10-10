@@ -288,12 +288,13 @@
     </main>
     <dialog id="attrsConfigDialog" aria-labelledby="attrsConfigTitle">
       <div class="config-heading"><h2 id="attrsConfigTitle">配置属性选择表</h2><button id="attrsConfigClose" type="button" aria-label="关闭配置">关闭</button></div>
-      <p>每组属性只能选择一个状态。先填写或导入属性选择表，再开始标注。</p>
+      <p>左侧填写属性词条，右侧填写可选状态。每个词条单选，不同词条可以使用相同状态名称。</p>
       <div class="config-actions">
         <button id="attrsImportBtn" type="button">导入配置</button>
         <button id="attrsExportBtn" type="button">导出配置</button>
         <input id="attrsConfigFile" type="file" accept=".json,application/json" hidden />
         <button id="attrsAddBtn" type="button">新增属性</button>
+        <button id="attrsPresetBtn" type="button">使用螺母示例</button>
       </div>
       <div id="attrsConfigRows" class="config-rows"></div>
       <p id="attrsConfigError" role="alert"></p>
