@@ -22,7 +22,7 @@ test("each attribute stores one independent state while preserving unrelated fie
   assert.deepEqual(core.choose({ "螺母轮廓及棱角": "旧状态" }, config.groups[0], "不可辨"), { "螺母轮廓及棱角": "不可辨" });
 });
 test("malformed annotations and legacy arrays cannot be silently overwritten", () => {
-  for (const value of [null, { 正常: 1 }, "正常", ["清晰"], { "轮廓": "" }, { "轮廓": null }]) assert.throws(() => core.choose(value, config.groups[0], "清晰"), /score_attrs/);
+  for (const value of [null, "正常", ["清晰"]]) assert.throws(() => core.choose(value, config.groups[0], "清晰"), /attrs/);
   assert.throws(() => core.choose({}, config.groups[0], "配置外名称"), /配置/);
   assert.deepEqual(core.read({}), {});
 });
@@ -42,4 +42,27 @@ test("the supplied nut preset includes all ten attributes and their exact states
   assert.deepEqual(table["底座及垫片"], ["清晰", "基本可辨", "不可辨", "不适用"]);
   assert.deepEqual(table["曝光"], ["正常", "轻微过曝", "严重过曝", "轻微欠曝", "严重欠曝"]);
   assert.deepEqual(table["遮挡及截断"], ["无", "部分遮挡", "严重遮挡", "部分截断", "严重截断"]);
+});
+
+test("attrs edits preserve existing metadata of any JSON type", () => {
+  const before = {box_type:"rectangle", count:2, visible:true, metadata:{source:"original"}, tags:["a"], unknown:null};
+  const after = core.choose(before, config.groups[0], "清晰");
+  assert.deepEqual(after, {...before, "螺母轮廓及棱角":"清晰"});
+  assert.deepEqual(core.choose(after, config.groups[0], null), before);
+});
+test("legacy score_attrs migrates into attrs with existing attrs taking precedence", () => {
+  const obj = {attrs:{box_type:"rectangle", 曝光:"正常", count:2}, score_attrs:{曝光:"轻微过曝", 螺母数量:"存疑"}};
+  core.migrateObject(obj);
+  assert.deepEqual(obj, {attrs:{曝光:"正常", 螺母数量:"存疑", box_type:"rectangle", count:2}});
+  core.migrateObject(obj);
+  assert.equal("score_attrs" in obj,false);
+});
+test("malformed legacy attributes remain intact and are reported", () => {
+  for (const legacy of [null, ["清晰"], {轮廓:1}, {轮廓:""}]) {
+    const obj={attrs:{box_type:"rectangle"},score_attrs:legacy};
+    const before=structuredClone(obj);
+    assert.throws(()=>core.migrateObject(obj), /score_attrs/);
+    assert.throws(()=>core.readObject(obj), /score_attrs/);
+    assert.deepEqual(obj,before);
+  }
 });

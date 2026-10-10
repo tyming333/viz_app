@@ -48,10 +48,25 @@
   }
   function read(value) {
     if (value === undefined) return {};
-    if (!value || Array.isArray(value) || typeof value !== "object" || Object.values(value).some(item => typeof item !== "string" || !item.trim())) {
-      throw new Error("当前框的 score_attrs 不是“属性词条: 状态”对象，请先核对原始数据；未覆盖已有内容");
+    if (!value || Array.isArray(value) || typeof value !== "object") {
+      throw new Error("当前框的 attrs 不是对象，请先核对原始数据；未覆盖已有内容");
     }
     return { ...value };
+  }
+  function readObject(obj) {
+    const attrs = read(obj.attrs);
+    if (!Object.prototype.hasOwnProperty.call(obj, "score_attrs")) return attrs;
+    const legacy = obj.score_attrs;
+    if (!legacy || Array.isArray(legacy) || typeof legacy !== "object" || Object.values(legacy).some(value => typeof value !== "string" || !value.trim())) {
+      throw new Error("旧 score_attrs 不是“属性词条: 状态”对象，请先核对原始数据；未覆盖已有内容");
+    }
+    return { ...legacy, ...attrs };
+  }
+  function migrateObject(obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, "score_attrs")) return;
+    const attrs = readObject(obj);
+    obj.attrs = attrs;
+    delete obj.score_attrs;
   }
   function choose(value, group, option) {
     const selected = read(value);
@@ -62,6 +77,6 @@
     if (option === null) delete next[group.name];
     return next;
   }
-  return { normalizeConfig: normalizeConfig, exportConfig: exportConfig, read: read, choose: choose,
+  return { normalizeConfig: normalizeConfig, exportConfig: exportConfig, read: read, readObject: readObject, migrateObject: migrateObject, choose: choose,
     defaultConfig: function () { return normalizeConfig(defaultTable); } };
 });

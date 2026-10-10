@@ -273,7 +273,7 @@
   }
 
   function undoLastChange() {
-    if (!state.editMode) return false;
+    if (!state.editMode && !window.AttributeUI.enabled()) return false;
     const previous = state.undoHistory.pop();
     if (!previous) {
       setStatus("没有可撤销的操作", 0);
@@ -1011,6 +1011,10 @@
   }
 
   function applyLoadedPayload(payload) {
+    payload.imageNames.forEach(name => payload.data[name].det.objects.forEach(obj => {
+      try { window.AttributesCore.migrateObject(obj); }
+      catch (_) { /* The attribute panel reports malformed legacy data without overwriting it. */ }
+    }));
     cancelImageSizeScan();
     clearUndoHistory();
     state.batchPreview = false;
@@ -1308,6 +1312,7 @@
     }
 
     state.batchPreview = nextEnabled;
+    window.AttributeUI.render();
     state.batchWheelDelta = 0;
     setHoverTarget({ kind: "none", index: -1 });
     if (nextEnabled) {
@@ -1409,6 +1414,7 @@
     });
     els.bboxGrid.replaceChildren(fragment);
     renderKeypointEditor(obj);
+    window.AttributeUI.render();
   }
 
   function renderKeypointEditor(obj) {
@@ -2028,6 +2034,11 @@
     state.currentImageIndex = nextName ? state.imageNames.indexOf(nextName) : -1;
     state.selectedObjectIndex = -1;
     updateImageSelection();
+    if (window.AttributeUI.enabled()) {
+      state.selectedObjectIndex = currentObjects().findIndex(obj => matchesAppliedOverlayFilter(obj));
+      renderObjects();
+      renderEditor();
+    }
     if (options && options.scrollList) {
       scrollCurrentImageIntoView();
     }
@@ -3060,13 +3071,14 @@
     }
   }, true);
   document.addEventListener("keydown", function onkeydown(event) {
+    if (document.getElementById("attrsConfigDialog").open) return;
     if (isCancelSelectionKey(event.key)) {
       if (cancelCanvasSelection()) event.preventDefault();
       return;
     }
     if (shouldIgnoreImageShortcut(event)) return;
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z") {
-      if (state.editMode && state.undoHistory.size() > 0) {
+      if ((state.editMode || window.AttributeUI.enabled()) && state.undoHistory.size() > 0) {
         event.preventDefault();
         undoLastChange();
       }
@@ -3095,6 +3107,18 @@
     renderAnnotationOverlays();
   });
 
+  window.AttributeUI.attach({
+    object: currentObject,
+    objects: currentObjects,
+    index: () => state.selectedObjectIndex,
+    batchPreview: () => state.batchPreview,
+    canUndo: () => state.undoHistory.size() > 0,
+    recordUndo: recordUndoSnapshot,
+    undo: undoLastChange,
+    selectObject: selectObject,
+    selectFirst: () => selectObject(currentObjects().findIndex(obj => matchesAppliedOverlayFilter(obj))),
+    resize: () => { syncCanvasSize(); resetView(); renderAnnotationOverlays(); }
+  });
   renderFull();
   applyImageAdjustments();
 })();

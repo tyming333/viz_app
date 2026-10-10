@@ -6,8 +6,11 @@
     <title>数据可视化工具</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./shared/app-switcher.css" />
+    <link rel="stylesheet" href="./attribute-annotator/attributes.css" />
     <script src="./shared/app-switcher.js" defer></script>
     <script src="./viewer-core.js" defer></script>
+    <script src="./attribute-annotator/attributes-core.js" defer></script>
+    <script src="./attribute-annotator/attributes.js" defer></script>
     <script src="./app.js" defer></script>
   </head>
   <body data-app="viewer">
@@ -34,6 +37,7 @@
         </h1>
       </div>
       <div class="actions">
+        <button id="attrsModeBtn" type="button" aria-pressed="false" aria-controls="attrsPanel">属性标注</button>
         <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
         <button id="downloadJsonBtn" type="button" title="导出当前 JSON">导出 JSON</button>
         <button id="exportSelectedBtn" type="button" title="导出勾选的图片和 JSON">选择导出</button>
@@ -210,6 +214,7 @@
 
         </div>
 
+        <div class="attribute-workspace">
         <div id="canvasShell" class="canvas-shell">
           <div id="stage" class="stage">
             <img id="mainImage" alt="" />
@@ -229,6 +234,16 @@
             <span>缩放: <output id="imageInfoZoom">100%</output></span>
             <span>创建时间: <output id="imageInfoCreated">-</output></span>
           </div>
+        </div>
+        <aside id="attrsPanel" class="attribute-panel" hidden>
+          <div class="panel-title"><strong>属性状态</strong><span id="attrsProgress">未配置</span></div>
+          <button id="attrsConfigureBtn" type="button">属性配置</button>
+          <p id="attrsTarget" class="attribute-target" aria-live="polite"></p>
+          <label class="field"><span>当前标注框</span><select id="attrsObjectSelect" aria-label="选择属性标注框"></select></label>
+          <div id="attrsChoices" class="attribute-choices"></div>
+          <button id="attrsUndoBtn" type="button" disabled>撤销上一步</button>
+          <p id="attrsMessage" class="attribute-message" role="status"></p>
+        </aside>
         </div>
       </section>
 
@@ -271,5 +286,19 @@
         </section>
       </aside>
     </main>
+    <dialog id="attrsConfigDialog" aria-labelledby="attrsConfigTitle">
+      <div class="config-heading"><h2 id="attrsConfigTitle">配置属性选择表</h2><button id="attrsConfigClose" type="button" aria-label="关闭配置">关闭</button></div>
+      <p>左侧填写属性词条，右侧填写可选状态。每个词条单选，不同词条可以使用相同状态名称。</p>
+      <div class="config-actions">
+        <button id="attrsImportBtn" type="button">导入配置</button>
+        <button id="attrsExportBtn" type="button">导出配置</button>
+        <input id="attrsConfigFile" type="file" accept=".json,application/json" hidden />
+        <button id="attrsAddBtn" type="button">新增属性</button>
+        <button id="attrsPresetBtn" type="button">使用螺母示例</button>
+      </div>
+      <div id="attrsConfigRows" class="config-rows"></div>
+      <p id="attrsConfigError" role="alert"></p>
+      <div class="config-footer"><button id="attrsApplyBtn" type="button">应用配置，开始标注</button></div>
+    </dialog>
   </body>
 </html>

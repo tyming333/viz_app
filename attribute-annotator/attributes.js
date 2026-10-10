@@ -3,7 +3,18 @@
   const core = window.AttributesCore;
   const byId = id => document.getElementById(id);
   const dialog = byId("attrsConfigDialog"), rows = byId("attrsConfigRows");
-  let config = null, viewer = null;
+  let config = null, viewer = null, enabled = false;
+
+  function setEnabled(value) {
+    enabled = !!value;
+    byId("attrsPanel").hidden = !enabled;
+    document.querySelector(".attribute-workspace").classList.toggle("attributes-enabled", enabled);
+    byId("attrsModeBtn").setAttribute("aria-pressed", String(enabled));
+    if (enabled && viewer && !viewer.object()) viewer.selectFirst();
+    render();
+    if (enabled && !config) openConfig();
+    if (viewer) window.requestAnimationFrame(viewer.resize);
+  }
 
   function showError(error) { byId("attrsConfigError").textContent = error.message || String(error); }
   function field(text, input) {
@@ -62,19 +73,20 @@
     output.classList.toggle("error", !!error);
   }
   function choose(group, option) {
-    if (!config || !viewer || viewer.batchPreview() || !viewer.object()) return;
+    if (!enabled || !config || !viewer || viewer.batchPreview() || !viewer.object()) return;
     try {
       const obj = viewer.object();
-      const next = core.choose(obj.score_attrs, group, option);
-      if (JSON.stringify(next) === JSON.stringify(obj.score_attrs)) return;
+      const next = core.choose(core.readObject(obj), group, option);
+      if (JSON.stringify(next) === JSON.stringify(obj.attrs) && !Object.prototype.hasOwnProperty.call(obj, "score_attrs")) return;
       viewer.recordUndo();
-      obj.score_attrs = next;
+      obj.attrs = next;
+      delete obj.score_attrs;
       render();
       message(option === null ? "已清空：" + group.name : "已保存：" + group.name + "：" + option);
     } catch (error) { message(error.message, true); }
   }
   function render() {
-    if (!viewer) return;
+    if (!viewer || !enabled) return;
     const obj = viewer.object(), objects = viewer.objects();
     const select = byId("attrsObjectSelect");
     const choices = byId("attrsChoices");
@@ -97,7 +109,7 @@
     message("");
     if (!config) { byId("attrsProgress").textContent = "未配置"; return; }
     let selected = {}, valid = true;
-    try { selected = obj ? core.read(obj.score_attrs) : {}; }
+    try { selected = obj ? core.readObject(obj) : {}; }
     catch (error) { valid = false; message(error.message, true); }
     let completed = 0;
     config.groups.forEach(group => {
@@ -139,6 +151,7 @@
     byId("attrsProgress").textContent = obj ? completed + " / " + config.groups.length : "0 / " + config.groups.length;
   }
 
+  byId("attrsModeBtn").addEventListener("click", () => setEnabled(!enabled));
   byId("attrsConfigureBtn").addEventListener("click", openConfig);
   rows.addEventListener("input", () => { byId("attrsConfigError").textContent = ""; });
   byId("attrsConfigClose").addEventListener("click", () => dialog.close());
@@ -164,6 +177,10 @@
   byId("attrsUndoBtn").addEventListener("click", () => viewer.undo());
   window.AttributeUI = {
     render: render,
-    attach: function (adapter) { viewer = adapter; render(); openConfig(); }
+    enabled: () => enabled,
+    attach: function (adapter) {
+      viewer = adapter;
+      if (window.location.hash === "#attributes") setEnabled(true);
+    }
   };
 })();

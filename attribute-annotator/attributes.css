@@ -2,8 +2,11 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 250px;
+  grid-template-columns: minmax(0, 1fr);
 }
+.attribute-workspace.attributes-enabled { grid-template-columns: minmax(0, 1fr) 250px; }
+.attribute-panel[hidden] { display: none; }
+#attrsModeBtn[aria-pressed="true"] { background: var(--accent); color: white; }
 .attribute-panel {
   min-width: 0;
   overflow-y: auto;
@@ -45,11 +48,11 @@
 .config-footer { display: flex; justify-content: flex-end; margin-top: 16px; }
 #attrsApplyBtn { background: var(--accent); color: white; }
 @media (max-width: 1180px) {
-  .attribute-workspace { min-height: 540px; }
+  .attribute-workspace.attributes-enabled { min-height: 540px; }
 }
 @media (max-width: 640px) {
-  .attribute-workspace { display: flex; flex-direction: column; }
-  .attribute-workspace .canvas-shell { flex: none; min-height: 400px; }
+  .attribute-workspace.attributes-enabled { display: flex; flex-direction: column; }
+  .attribute-workspace.attributes-enabled .canvas-shell { flex: none; min-height: 400px; }
   .attribute-panel { border-left: 1px solid var(--line); overflow: visible; }
   .topbar { height: auto; min-height: 29px; flex-wrap: wrap; padding: 4px 10px; }
   .config-row { grid-template-columns: minmax(0, 1fr) auto; }

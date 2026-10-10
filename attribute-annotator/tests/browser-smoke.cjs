@@ -68,7 +68,8 @@ const server = http.createServer((req, res) => {
   const url = process.env.ATTRS_TEST_FILE_URL ? require("node:url").pathToFileURL(path.join(root, "attribute-annotator/index.html")).href : `http://127.0.0.1:${server.address().port}/attribute-annotator/index.html`;
   await call("Page.navigate", { url });
   await until(() => evaluate("!!window.AttributeUI && document.getElementById('attrsConfigDialog').open"));
-  assert.equal(await evaluate("document.getElementById('appSwitcher').value"), "attribute-annotator");
+  assert.equal(await evaluate("document.getElementById('appSwitcher').value"), "viewer");
+  assert.equal(await evaluate("Array.from(document.getElementById('appSwitcher').options).some(option=>option.value==='attribute-annotator')"), false);
   assert.equal(await evaluate("document.querySelectorAll('.config-row').length"), 10);
   await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts, "config.png"), Buffer.from(result.data, "base64")));
   await evaluate("document.querySelector('[data-config-field=name]').value=''");
@@ -104,7 +105,7 @@ const server = http.createServer((req, res) => {
     const bytes=Uint8Array.from(atob(c.toDataURL().split(',')[1]), value=>value.charCodeAt(0));
     const makeImage=()=>URL.createObjectURL(new Blob([bytes], {type:'image/png'}));
     const image=makeImage();
-    const objects=[{labels:['正常无遮挡螺母'],bbox:[56,102,90,102,90,174,56,174],attrs:{original:'keep'},score_attrs:{旧属性:'保留'}},{labels:['备用螺母'],bbox:[300,75,360,75,360,135,300,135],attrs:{}}];
+    const objects=[{labels:['正常无遮挡螺母'],bbox:[56,102,90,102,90,174,56,174],attrs:{original:'keep',box_type:'rectangle',count:2,metadata:{source:'original'}},score_attrs:{旧属性:'保留'}},{labels:['备用螺母'],bbox:[300,75,360,75,360,135,300,135],attrs:{}}];
     const data={[image]:{width:640,height:182,custom:'keep',det:{objects}}};
     const image2=makeImage(); data[image2]={width:640,height:182,det:{objects:structuredClone(objects)}};
     const image3=makeImage(); data[image3]={width:640,height:182,det:{objects:[]}};
@@ -124,20 +125,20 @@ const server = http.createServer((req, res) => {
   await click("downloadJsonBtn");
   let data = JSON.parse(await evaluate("lastJsonBlob.text()"));
   const first = Object.keys(fixture)[0], second = Object.keys(fixture)[1];
-  assert.deepEqual(data[first].det.objects[0].score_attrs, {旧属性:'保留', 螺母轮廓及棱角:'清晰', 螺杆轮廓:'清晰', 螺母数量:'存疑'});
-  assert.deepEqual(data[first].det.objects[0].attrs, { original: "keep" });
+  assert.deepEqual(data[first].det.objects[0].attrs, {旧属性:'保留', original:'keep', box_type:'rectangle', count:2, metadata:{source:'original'}, 螺母轮廓及棱角:'清晰', 螺杆轮廓:'清晰', 螺母数量:'存疑'});
+  assert.equal("score_attrs" in data[first].det.objects[0], false);
   assert.equal(data[first].custom, "keep");
   assert.equal("score_attrs" in data[first].det.objects[1], false);
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown',{key:'z',ctrlKey:true}))");
   await click("downloadJsonBtn");
   data = JSON.parse(await evaluate("lastJsonBlob.text()"));
-  assert.deepEqual(data[first].det.objects[0].score_attrs, {旧属性:'保留', 螺母轮廓及棱角:'清晰', 螺杆轮廓:'清晰', 螺母数量:'明确可辨'});
+  assert.deepEqual(data[first].det.objects[0].attrs, {旧属性:'保留', original:'keep', box_type:'rectangle', count:2, metadata:{source:'original'}, 螺母轮廓及棱角:'清晰', 螺杆轮廓:'清晰', 螺母数量:'明确可辨'});
   assert.equal(await evaluate(`${stateButton("螺母数量", "明确可辨")}.getAttribute('aria-pressed')`), "true");
   await evaluate("document.querySelector('[data-attribute-clear=螺母轮廓及棱角]').click()");
   await click("downloadJsonBtn");
   data = JSON.parse(await evaluate("lastJsonBlob.text()"));
-  assert.equal('螺母轮廓及棱角' in data[first].det.objects[0].score_attrs, false);
-  assert.equal(data[first].det.objects[0].score_attrs['螺杆轮廓'], '清晰');
+  assert.equal('螺母轮廓及棱角' in data[first].det.objects[0].attrs, false);
+  assert.equal(data[first].det.objects[0].attrs['螺杆轮廓'], '清晰');
   await click("attrsUndoBtn");
   await evaluate("const select=document.getElementById('attrsObjectSelect');select.value='1';select.dispatchEvent(new Event('change'))");
   await choose("螺母数量", "不可辨");
@@ -154,8 +155,8 @@ const server = http.createServer((req, res) => {
   await choose("曝光", "轻微过曝");
   await click("downloadJsonBtn");
   data = JSON.parse(await evaluate("lastJsonBlob.text()"));
-  assert.deepEqual(data[second].det.objects[0].score_attrs, {旧属性:'保留', 曝光:'轻微过曝'});
-  assert.deepEqual(data[first].det.objects[1].score_attrs, {螺母数量:'不可辨'});
+  assert.deepEqual(data[second].det.objects[0].attrs, {旧属性:'保留', original:'keep', box_type:'rectangle', count:2, metadata:{source:'original'}, 曝光:'轻微过曝'});
+  assert.deepEqual(data[first].det.objects[1].attrs, {螺母数量:'不可辨'});
   await click("batchPreviewBtn");
   assert.equal(await evaluate("Array.from(document.querySelectorAll('[data-attribute-option]')).every(button=>button.disabled)"), true);
   await click("batchPreviewBtn");
@@ -183,12 +184,41 @@ const server = http.createServer((req, res) => {
   await click("labelZoomBtn");
   await pause(150);
   assert.equal(await evaluate("(() => {const c=document.getElementById('canvasShell').getBoundingClientRect(),p=document.querySelector('.attribute-panel').getBoundingClientRect();return c.width>250 && p.left>=c.right-1 && c.height>300;})()"), true);
+  // Folding the panel preserves configuration, selections, annotations and canvas fit.
+  const beforeToggle = data;
+  await click("attrsModeBtn");
+  assert.equal(await evaluate("document.getElementById('attrsPanel').hidden"), true);
+  await click("attrsModeBtn");
+  assert.equal(await evaluate("document.getElementById('attrsPanel').hidden"), false);
+  assert.equal(await evaluate("document.getElementById('attrsConfigDialog').open"), false);
+  assert.equal(await evaluate(`${stateButton("曝光", "轻微过曝")}.getAttribute('aria-pressed')`), "true");
+  // Box editing and attribute editing use the same object and history.
+  await click("editModeBtn");
+  await evaluate("const input=document.getElementById('labelsEditor');input.value='修改后的框';input.dispatchEvent(new Event('change'))");
+  await click("downloadJsonBtn");
+  data = JSON.parse(await evaluate("lastJsonBlob.text()"));
+  assert.deepEqual(data[second].det.objects[0].labels, ['修改后的框']);
+  assert.deepEqual(data[second].det.objects[0].attrs, beforeToggle[second].det.objects[0].attrs);
+  await click("attrsUndoBtn");
+  await click("editModeBtn");
+  await click("downloadJsonBtn");
+  data = JSON.parse(await evaluate("lastJsonBlob.text()"));
+  assert.deepEqual(data[second].det.objects[0].labels, fixture[second].det.objects[0].labels);
+  await pause(150);
   await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts, "desktop.png"), Buffer.from(result.data, "base64")));
   await call("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false });
   await evaluate("document.querySelector('.attribute-workspace').scrollIntoView()");
   await pause(150);
   assert.equal(await evaluate("document.documentElement.scrollWidth<=window.innerWidth"), true);
   await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts, "mobile.png"), Buffer.from(result.data, "base64")));
+  // Ordinary entry leaves the attribute panel closed and does not require configuration.
+  const viewerUrl = process.env.ATTRS_TEST_FILE_URL ? require("node:url").pathToFileURL(path.join(root, "index.html")).href : `http://127.0.0.1:${server.address().port}/index.html`;
+  await call("Page.navigate", { url: viewerUrl });
+  await until(() => evaluate("!!window.AttributeUI && document.getElementById('attrsModeBtn')"));
+  assert.equal(await evaluate("document.getElementById('attrsPanel').hidden"), true);
+  assert.equal(await evaluate("document.getElementById('attrsConfigDialog').open"), false);
+  await click("attrsModeBtn");
+  assert.equal(await evaluate("document.getElementById('attrsConfigDialog').open"), true);
   assert.deepEqual(exceptions, []);
   console.log("Attribute annotation browser smoke passed", artifacts);
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
