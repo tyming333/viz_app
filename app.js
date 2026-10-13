@@ -268,7 +268,7 @@
         transaction.oncomplete = resolve;
         transaction.onabort = transaction.onerror = () => reject(transaction.error || new Error("本地保存失败"));
       });
-      if (revision === draftRevision) window.AttributeUI.draftStatus("已自动保存到本机，刷新后可恢复。", false);
+      if (revision === draftRevision) window.AttributeUI.draftStatus("已自动保存到本机，刷新后可恢复", false);
     } catch (error) {
       window.AttributeUI.draftStatus("本地自动保存失败，请导出 JSON 保存修改：" + error.message, true);
     }
@@ -578,6 +578,7 @@
     }
 
     container.addEventListener("scroll", render);
+    new ResizeObserver(render).observe(container);
 
     return {
       setItems(items, selectedIndex) {
@@ -1055,6 +1056,7 @@
     if (state.batchPreview) state.batchOffset = 0;
     renderImageControls();
     renderBoxVisibilityToggle();
+    refreshLabelZoom();
     renderAnnotationOverlays();
   }
 
@@ -1075,6 +1077,7 @@
     renderImageControls();
     selectImage(firstFilteredImageName(state.filteredImageNames), { scrollList: true });
     renderBoxVisibilityToggle();
+    refreshLabelZoom();
     renderAnnotationOverlays();
     setStatus("已刷新筛选结果: " + state.filteredImageNames.length + "/" + state.imageNames.length, 100);
   }
@@ -1696,6 +1699,7 @@
     if (state.showAllOverlayObjects) state.showContainedBoxes = false;
     if (state.showAllOverlayObjects) state.showBoxes = true;
     renderBoxVisibilityToggle();
+    refreshLabelZoom();
     renderAnnotationOverlays();
   }
 
@@ -1707,6 +1711,7 @@
       state.showBoxes = true;
     }
     renderBoxVisibilityToggle();
+    refreshLabelZoom();
     renderAnnotationOverlays();
   }
 
@@ -2267,7 +2272,6 @@
     renderEditor();
     renderBoxVisibilityToggle();
     renderOverlay();
-    if (hadSelection) setStatus("已取消选中", 100);
     if (hadSelection) scheduleDraftSave();
     return hadSelection;
   }
@@ -2704,10 +2708,18 @@
     applyViewTransform();
   }
 
+  function refreshLabelZoom() {
+    if (state.labelZoom && !state.batchPreview && els.mainImage.complete) focusLabelsView();
+  }
+
   function focusLabelsView() {
     const imageWidth = els.mainImage.naturalWidth || 0;
     const imageHeight = els.mainImage.naturalHeight || 0;
-    const bounds = getLabelZoomBounds(currentObjects(), state.labelZoomSize, imageWidth, imageHeight);
+    const objects = currentObjects();
+    const containers = state.showContainedBoxes ? getFilteredContainerBboxes(objects) : [];
+    const visible = objects.filter((obj, index) => index === state.selectedObjectIndex
+      || (state.showBoxes && isObjectVisibleInOverlay(obj, index, objects, containers)));
+    const bounds = getLabelZoomBounds(visible, state.labelZoomSize, imageWidth, imageHeight);
     if (!bounds) {
       resetImageView();
       return;
@@ -3104,6 +3116,7 @@
   els.boxVisibilityBtn.addEventListener("click", function onbox() {
     state.showBoxes = !state.showBoxes;
     renderBoxVisibilityToggle();
+    refreshLabelZoom();
     renderAnnotationOverlays();
   });
   els.fillToggleBtn.addEventListener("click", function onfill() {

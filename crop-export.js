@@ -7,7 +7,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey));
       for (const key of Object.keys(padding)) {
-        if (Number.isFinite(saved?.[key]) && saved[key] >= 0) padding[key] = saved[key];
+        if (Number.isFinite(saved?.[key])) padding[key] = saved[key];
       }
     } catch (_) {}
     const menu = document.createElement("div");
@@ -17,7 +17,7 @@
     menu.setAttribute("aria-label", "裁剪导出配置");
     Object.assign(menu.style, { position: "fixed", zIndex: "1000", background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", borderRadius: "6px", padding: "12px", boxShadow: "0 4px 20px #0003", width: "240px", maxWidth: "calc(100vw - 16px)", maxHeight: "calc(100vh - 16px)", overflowY: "auto" });
     const title = document.createElement("strong");
-    title.textContent = "裁剪导出 · 扩框比例";
+    title.textContent = "裁剪导出 · 扩缩比例";
     menu.append(title);
     const fields = document.createElement("div");
     Object.assign(fields.style, { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", margin: "10px 0" });
@@ -26,7 +26,7 @@
       const label = document.createElement("label"), input = document.createElement("input");
       label.textContent = name;
       input.type = "number";
-      input.min = "0";
+      input.title = "正数向外扩，负数向内缩；按原框宽高计算";
       input.step = "0.05";
       input.value = String(padding[key]);
       input.dataset.cropSide = key;
@@ -248,8 +248,8 @@
       const next = {};
       for (const key of Object.keys(padding)) {
         const value = inputs[key].value.trim() ? Number(inputs[key].value) : NaN;
-        if (!Number.isFinite(value) || value < 0) {
-          output.textContent = "扩框比例必须是大于或等于 0 的数字";
+        if (!Number.isFinite(value)) {
+          output.textContent = "扩缩比例必须是有效数字，正数向外扩，负数向内缩";
           return false;
         }
         next[key] = value;
@@ -313,11 +313,14 @@
         const xs = selected.bbox.filter((_, i) => i % 2 === 0), ys = selected.bbox.filter((_, i) => i % 2 === 1);
         const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
         const width = maxX - minX, height = maxY - minY;
+        if (width * (1 + ratios.left + ratios.right) <= 0 || height * (1 + ratios.top + ratios.bottom) <= 0) {
+          throw new Error("扩缩后没有可裁剪区域，请减小向内收缩的比例");
+        }
         const left = Math.max(0, Math.floor(minX - width * ratios.left));
         const top = Math.max(0, Math.floor(minY - height * ratios.top));
         const right = Math.min(bitmap.width, Math.ceil(maxX + width * ratios.right));
         const bottom = Math.min(bitmap.height, Math.ceil(maxY + height * ratios.bottom));
-        if (right <= left || bottom <= top) throw new Error("框没有可裁剪的图像区域");
+        if (right <= left || bottom <= top) throw new Error("扩缩后没有可裁剪区域，请减小向内收缩的比例");
         const canvas = document.createElement("canvas");
         canvas.width = right - left;
         canvas.height = bottom - top;

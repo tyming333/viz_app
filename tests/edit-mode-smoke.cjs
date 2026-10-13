@@ -204,6 +204,29 @@ const server = http.createServer((req, res) => {
     button.click();
     return enabled && resized && !editModeTest.state.labelZoom;
   })()`), true, "label zoom focuses all boxes and accepts an adjustable minimum size");
+  assert.equal(await evaluate(`(()=>{
+    const field=document.getElementById('labelFilterField'), list=document.getElementById('imageList'), name=document.getElementById('imageFilter');
+    const before={field:field.offsetHeight,list:list.offsetHeight,name:name.offsetHeight};
+    for(const label of editModeTest.state.labelOptions) document.querySelector('#labelSelectMenu button[data-label-value="'+label+'"]').click();
+    const grew=field.offsetHeight>before.field && list.offsetHeight<before.list && name.offsetHeight===before.name && field.scrollWidth===field.clientWidth;
+    document.getElementById('clearFiltersBtn').click();return grew && field.offsetHeight===before.field;
+  })()`), true, "label chips wrap downward, reclaim image-list space and restore it when cleared");
+  assert.equal(await evaluate(`(()=>{
+    const s=editModeTest.state, canvas=document.getElementById('canvasShell'), size=document.getElementById('labelZoomSizeInput');
+    editModeTest.selectObject(-1);size.value='64';size.dispatchEvent(new Event('change'));
+    document.getElementById('labelFilter').value='sample';document.getElementById('applyFiltersBtn').click();
+    document.getElementById('labelZoomBtn').click();
+    const centered=(x,y)=>Math.abs(s.panX+x*s.zoom-canvas.clientWidth/2)<1&&Math.abs(s.panY+y*s.zoom-canvas.clientHeight/2)<1;
+    const filtered=centered(350,180);
+    document.getElementById('showContainedBoxesBtn').click();const contained=centered(350,180);
+    document.getElementById('showAllBoxesBtn').click();const all=centered(415,180);
+    document.getElementById('boxVisibilityBtn').click();
+    const hidden=s.zoom===Math.min(1,(canvas.clientWidth-24)/2000,(canvas.clientHeight-24)/1500);
+    editModeTest.selectObject(2);size.dispatchEvent(new Event('change'));const selected=centered(720,130);
+    editModeTest.selectObject(-1);document.getElementById('boxVisibilityBtn').click();document.getElementById('showAllBoxesBtn').click();
+    document.getElementById('resetViewBtn').click();document.getElementById('clearFiltersBtn').click();size.value='512';size.dispatchEvent(new Event('change'));
+    return filtered&&contained&&all&&hidden&&selected;
+  })()`), true, "label zoom uses only displayed boxes, including contained boxes and individually selected hidden boxes");
   assert.equal(await evaluate(`(() => {
     const s=editModeTest.state, canvas=document.getElementById('canvasShell');
     const original={zoom:s.zoom,panX:s.panX,panY:s.panY,index:s.selectedObjectIndex};
@@ -305,6 +328,24 @@ const server = http.createServer((req, res) => {
     if (!(defaults && remembered && dimensions?.[0]===340 && dimensions?.[1]===224)) throw Error(JSON.stringify({defaults,remembered,dimensions,message:menu.textContent}));
     return true;
   })()`), true, "right-click crop uses the current layer under filtering plus contained boxes and remembers ratios");
+  assert.deepEqual(await evaluate(`(async()=>{
+    editModeTest.selectObject(0);
+    document.getElementById('canvasShell').dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));
+    const inputs=[...document.querySelectorAll('[data-crop-side]')];
+    const original=HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click=function(){window.cropTestUrl=this.href;};
+    inputs.forEach(input=>{input.value='-0.2';input.dispatchEvent(new Event('change'));});
+    window.cropTestUrl=null;document.getElementById('cropExportBtn').click();
+    for(let i=0;i<100&&!window.cropTestUrl;i++)await new Promise(r=>setTimeout(r,20));
+    const b=await createImageBitmap(await(await fetch(cropTestUrl)).blob());const size=[b.width,b.height];b.close();
+    const remembered=Object.values(JSON.parse(localStorage.getItem('viz-app.crop-padding'))).every(value=>value===-0.2);
+    inputs.forEach(input=>{input.value='-0.6';});window.cropTestUrl=null;document.getElementById('cropExportBtn').click();
+    for(let i=0;i<100&&document.getElementById('cropExportBtn').disabled;i++)await new Promise(r=>setTimeout(r,20));
+    const rejected=!window.cropTestUrl&&document.getElementById('cropExportMenu').textContent.includes('扩缩后没有可裁剪区域');
+    inputs.forEach(input=>{input.value='0.2';input.dispatchEvent(new Event('change'));});
+    HTMLAnchorElement.prototype.click=original;document.getElementById('cropExportMenu').hidden=true;editModeTest.selectObject(-1);
+    return {size,remembered,rejected};
+  })()`), {size:[120,96],remembered:true,rejected:true}, "negative ratios shrink each edge relative to the original dimensions and reject collapsed crops");
   const currentLayer = await evaluate("document.getElementById('mainImage').src");
   for (const readable of [true, false]) {
     await evaluate(`document.getElementById('mainImage').src='http://127.0.0.1:${imageServer.address().port}/image.png?cors=${readable ? 1 : 0}'`);
