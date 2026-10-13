@@ -4,8 +4,9 @@
   const byId = id => document.getElementById(id);
   const dialog = byId("attrsConfigDialog");
   let config = null, viewer = null, enabled = false;
+  let pendingImport = null, resolveImport = null;
 
-  function setEnabled(value) {
+  function setEnabled(value, persist = true) {
     enabled = !!value;
     byId("attrsPanel").hidden = !enabled;
     document.querySelector(".attribute-workspace").classList.toggle("attributes-enabled", enabled);
@@ -14,6 +15,7 @@
     render();
     if (enabled && !config) openConfig();
     if (viewer) window.requestAnimationFrame(viewer.resize);
+    if (viewer && persist) viewer.saveDraft();
   }
 
   function showError(error) { byId("attrsConfigError").textContent = error.message || String(error); }
@@ -34,34 +36,17 @@
     try {
       const obj = viewer.object();
       const next = core.choose(core.readObject(obj), group, option);
-      if (JSON.stringify(next) === JSON.stringify(obj.attrs) && !Object.prototype.hasOwnProperty.call(obj, "score_attrs")) return;
+      if (JSON.stringify(next) === JSON.stringify(obj.attrs)) return;
       viewer.recordUndo();
       obj.attrs = next;
-      delete obj.score_attrs;
+
       render();
       message(option === null ? "已清空：" + group.name : "已保存：" + group.name + "：" + option);
     } catch (error) { message(error.message, true); }
   }
   function render() {
     if (!viewer || !enabled) return;
-    const obj = viewer.object(), objects = viewer.objects();
-    const select = byId("attrsObjectSelect");
-    const choices = byId("attrsChoices");
-    select.replaceChildren();
-    const empty = document.createElement("option");
-    empty.value = "-1";
-    empty.textContent = objects.length ? "选择标注框" : "当前图片没有标注框";
-    select.append(empty);
-    objects.forEach((item, index) => {
-      const option = document.createElement("option");
-      option.value = String(index);
-      option.textContent = "#" + (index + 1) + " · " + (item.labels || []).join(" / ");
-      select.append(option);
-    });
-    select.value = String(viewer.index());
-    select.disabled = !objects.length || viewer.batchPreview();
-    byId("attrsUndoBtn").disabled = !viewer.canUndo();
-    byId("attrsTarget").textContent = !config ? "请先配置或导入属性选择表" : viewer.batchPreview() ? "退出批量预览后选择属性" : obj ? "当前标注：#" + (viewer.index() + 1) + " · " + (obj.labels || []).join(" / ") : "请在图中、Objects 列表或上方选择标注框";
+    const obj = viewer.object(), choices = byId("attrsChoices");
     choices.replaceChildren();
     message("");
     if (!config) { byId("attrsProgress").textContent = "未配置"; return; }
@@ -114,6 +99,40 @@
     byId("attrsProgress").textContent = obj ? completed + " / " + config.groups.length : "0 / " + config.groups.length;
   }
 
+  function updateImportValidation() {
+    if (!pendingImport) return;
+    const reuse = byId("attrsReuseOnImport").checked;
+    byId("attrsDataImportConfirm").disabled = reuse && !config;
+    byId("attrsImportConfigureBtn").hidden = !reuse || !!config;
+    const output = byId("attrsImportValidation");
+    output.classList.remove("error");
+    if (!reuse) { output.textContent = "按原始内容导入，不进行属性校验。"; return; }
+    if (!config) { output.textContent = "请先导入属性配置，以校验已有标注；也可取消勾选后直接导入。"; return; }
+    let reused = 0, states = 0, empty = 0;
+    const unmatched = new Set(), errors = [];
+    Object.entries(pendingImport).forEach(([image, entry]) => entry.det.objects.forEach((object, index) => {
+      try {
+        const result = core.validateExisting(object, config);
+        result.unmatched.forEach(name => unmatched.add(name));
+        if (result.errors.length) { errors.push(image + " #" + (index + 1) + "：" + result.errors.join("；")); return; }
+        const count = Object.keys(result.values).length;
+        if (count) { reused += 1; states += count; } else empty += 1;
+      } catch (error) { errors.push(image + " #" + (index + 1) + "：" + error.message); }
+    }));
+    output.textContent = "校验通过，可复用 " + reused + " 个框、" + states + " 项属性；" + empty + " 个框尚未标注。" + (unmatched.size ? "\n配置外字段保留，不作为属性复用：" + Array.from(unmatched).join("、") : "") + (errors.length ? "\n校验失败 " + errors.length + " 个框：\n" + errors.slice(0, 20).join("\n") : "");
+    output.classList.toggle("error", !!errors.length);
+  }
+  function finishImport(accepted) {
+    byId("attrsDataImportDialog").close();
+    const resolve = resolveImport;
+    pendingImport = resolveImport = null;
+    if (resolve) resolve(accepted);
+  }
+  byId("attrsReuseOnImport").addEventListener("change", updateImportValidation);
+  byId("attrsImportConfigureBtn").addEventListener("click", openConfig);
+  byId("attrsDataImportConfirm").addEventListener("click", () => finishImport(true));
+  byId("attrsDataImportCancel").addEventListener("click", () => finishImport(false));
+  byId("attrsDataImportDialog").addEventListener("cancel", event => { event.preventDefault(); finishImport(false); });
   byId("attrsModeBtn").addEventListener("click", () => setEnabled(!enabled));
   byId("attrsConfigureBtn").addEventListener("click", openConfig);
   byId("attrsConfigClose").addEventListener("click", () => dialog.close());
@@ -123,22 +142,43 @@
     if (!file) return;
     try {
       config = core.normalizeConfig(JSON.parse(await file.text()));
+      viewer.saveDraft();
+
       byId("attrsConfigSummary").textContent = "已导入 " + file.name + "（" + config.groups.length + " 个属性词条）";
       byId("attrsConfigError").textContent = "";
       dialog.close();
+      updateImportValidation();
       render();
     }
     catch (error) { showError(error); }
     finally { event.target.value = ""; }
   });
-  byId("attrsObjectSelect").addEventListener("change", event => viewer.selectObject(Number(event.target.value)));
-  byId("attrsUndoBtn").addEventListener("click", () => viewer.undo());
   window.AttributeUI = {
     render: render,
     enabled: () => enabled,
+    confirmImport: function (data) {
+      const hasAttributes = Object.values(data).some(entry => entry.det.objects.some(object => object.attrs && (Array.isArray(object.attrs) || typeof object.attrs !== "object" || Object.entries(object.attrs).some(([name, value]) => name !== "box_type" && typeof value === "string"))));
+      if (!hasAttributes) return Promise.resolve(true);
+      if (resolveImport) finishImport(false);
+      pendingImport = data;
+      byId("attrsReuseOnImport").checked = true;
+      updateImportValidation();
+      byId("attrsDataImportDialog").showModal();
+      return new Promise(resolve => { resolveImport = resolve; });
+    },
+    draft: () => ({ config, enabled }),
+    restoreDraft: function (saved) {
+      config = saved?.config ? core.normalizeConfig(saved.config) : null;
+      if (config && dialog.open) dialog.close();
+      setEnabled(saved ? !!saved.enabled : window.location.hash === "#attributes", false);
+    },
+    draftStatus: function (text, error) {
+      byId("attrsDraftStatus").textContent = text;
+      byId("attrsDraftStatus").classList.toggle("error", !!error);
+    },
     attach: function (adapter) {
       viewer = adapter;
-      if (window.location.hash === "#attributes") setEnabled(true);
+      if (window.location.hash === "#attributes") setEnabled(true, false);
     }
   };
 })();

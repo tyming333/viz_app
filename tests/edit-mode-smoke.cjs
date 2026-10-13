@@ -16,20 +16,31 @@ async function until(fn) {
   }
   throw new Error("Timed out waiting for browser");
 }
-let browser, ws;
+let browser, ws, imageFixture;
+const imageServer = http.createServer((req, res) => {
+  if (req.url.includes("cors=1")) res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Content-Type", "image/png");
+  res.end(imageFixture);
+});
 const server = http.createServer((req, res) => {
+  if (new URL(req.url, "http://localhost").pathname === "/test-image.png" && imageFixture) {
+    res.setHeader("Content-Type", "image/png");
+    res.end(imageFixture);
+    return;
+  }
   const file = path.resolve(root, new URL(req.url, "http://localhost").pathname.slice(1) || "index.html");
   if (!file.startsWith(root + path.sep)) { res.writeHead(403); res.end(); return; }
   fs.readFile(file, (error, bytes) => {
     if (error) { res.writeHead(404); res.end(); return; }
     res.setHeader("Content-Type", ({ ".html": "text/html", ".js": "text/javascript", ".css": "text/css" })[path.extname(file)] || "application/octet-stream");
     // Expose state only in the test server, so assertions inspect exported data too.
-    if (file === path.join(root, "app.js")) bytes = bytes.toString().replace(/\}\)\(\);\s*$/, "window.editModeTest = { state, exportText, loadJsonOnMainThread, selectObject, isObjectVisibleInOverlay, pickObjectAtPoint };})();");
+    if (file === path.join(root, "app.js")) bytes = bytes.toString().replace(/\}\)\(\);\s*$/, "window.editModeTest = { state, exportText, loadJsonOnMainThread, selectObject, isObjectVisibleInOverlay, pickObjectAtPoint, getObjectColor };})();");
     res.end(bytes);
   });
 });
 (async () => {
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
+  await new Promise(resolve => imageServer.listen(0, "127.0.0.1", resolve));
   const profile = fs.mkdtempSync(path.join(artifacts, "edge-profile-"));
   browser = spawn(process.env.VIEWER_TEST_BROWSER || "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { windowsHide: true, stdio: "ignore" });
   browser.on("error", error => console.error(error));
@@ -80,12 +91,15 @@ const server = http.createServer((req, res) => {
   await call("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await call("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/` });
   await until(() => evaluate("!!window.editModeTest"));
-  await evaluate(`(() => {
+  imageFixture = Buffer.from(await evaluate(`(() => {
     const canvas=document.createElement('canvas'); canvas.width=2000; canvas.height=1500;
     const ctx=canvas.getContext('2d'); ctx.fillStyle='#eeeeee'; ctx.fillRect(0,0,2000,1500);
-    const image=URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
+    return canvas.toDataURL().split(',')[1];
+  })()`), "base64");
+  await evaluate(`(() => {
+    const image=location.origin+'/test-image.png?image=1';
     const data = {[image]:{det:{objects:[{labels:['sample'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'},keypoints:{points:[[150,150]],names:['point']}},{labels:['inside'],bbox:[260,220,280,220,280,240,260,240]},{labels:['outside'],bbox:[710,120,730,120,730,140,710,140]},{labels:['sample-other'],bbox:[400,100,600,100,600,260,400,260]},{labels:['inside-2'],bbox:[560,220,580,220,580,240,560,240]}]}}};
-    const secondImage = URL.createObjectURL(new Blob([Uint8Array.from(atob(canvas.toDataURL().split(',')[1]), c=>c.charCodeAt(0))], {type:'image/png'}));
+    const secondImage = location.origin+'/test-image.png?image=2';
     data[secondImage] = structuredClone(data[image]);
     editModeTest.loadJsonOnMainThread(JSON.stringify(data));
   })()`);
@@ -214,6 +228,24 @@ const server = http.createServer((req, res) => {
     s.showBoxes=originalVisibility;
     return true;
   })()`), true, "repeated Objects clicks cancel highlighting without changing global visibility or view");
+  assert.equal(await evaluate(`(async () => {
+    const s=editModeTest.state, visibility=s.showBoxes, keypoints=s.showKeypoints;
+    const strokes=[], original=CanvasRenderingContext2D.prototype.stroke;
+    CanvasRenderingContext2D.prototype.stroke=function(...args){if(this.canvas.id==='overlayCanvas')strokes.push({color:this.strokeStyle,shadow:this.shadowColor});return original.apply(this,args);};
+    s.showBoxes=false;s.showKeypoints=false;editModeTest.selectObject(0);
+    await new Promise(resolve=>setTimeout(resolve,70));
+    CanvasRenderingContext2D.prototype.stroke=original;
+    s.showBoxes=visibility;s.showKeypoints=keypoints;editModeTest.selectObject(-1);
+    const color=editModeTest.getObjectColor(s.data[s.currentImage].det.objects[0],0);
+    return strokes.length>0 && strokes.every(stroke=>stroke.color===color && !stroke.shadow.startsWith('rgba(250, 204, 21'));
+  })()`), true, "selected breathing outlines retain their label color when global boxes are hidden");
+  await click("resetViewBtn");
+  await evaluate("editModeTest.selectObject(0)");
+  const blank = await evaluate("(() => {const s=editModeTest.state,r=document.getElementById('canvasShell').getBoundingClientRect();return {x:r.left+s.panX+1000*s.zoom,y:r.top+s.panY+800*s.zoom};})()");
+  await call("Input.dispatchMouseEvent", {type:"mousePressed",...blank,button:"left",clickCount:1});
+  await call("Input.dispatchMouseEvent", {type:"mouseReleased",...blank,button:"left",clickCount:1});
+  assert.equal(await evaluate("editModeTest.state.selectedObjectIndex"), -1, "clicking empty canvas clears the active box");
+  await until(() => evaluate("editModeTest.state.hoverAnimationFrame===0"));
   assert.equal(await evaluate(`(() => {
     const s=editModeTest.state, objects=s.data[s.currentImage].det.objects;
     const original=objects.slice(), index=s.selectedObjectIndex, filter=s.appliedFilters;
@@ -241,6 +273,9 @@ const server = http.createServer((req, res) => {
     return overlap && protruding && tolerance && exposedLarge && selectedSmall && ignoresHidden;
   })()`), true, "overlapping small boxes win independently of order and selected large edge editing");
   assert.equal(await evaluate(`(async () => {
+    document.getElementById('labelFilter').value='sample';
+    document.getElementById('applyFiltersBtn').click();
+    document.getElementById('showContainedBoxesBtn').click();
     editModeTest.selectObject(0);
     const canvas=document.getElementById('canvasShell');
     canvas.dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));
@@ -258,9 +293,33 @@ const server = http.createServer((req, res) => {
     const remembered=JSON.parse(localStorage.getItem('viz-app.crop-padding')).left===0.5;
     input.value='0.2';input.dispatchEvent(new Event('change'));
     menu.hidden=true;editModeTest.selectObject(-1);
+    document.getElementById('showContainedBoxesBtn').click();
+    document.getElementById('clearFiltersBtn').click();
     if (!(defaults && remembered && dimensions?.[0]===340 && dimensions?.[1]===224)) throw Error(JSON.stringify({defaults,remembered,dimensions,message:menu.textContent}));
     return true;
-  })()`), true, "right-click crop exports padded original pixels and remembers ratios");
+  })()`), true, "right-click crop uses the current layer under filtering plus contained boxes and remembers ratios");
+  const currentLayer = await evaluate("document.getElementById('mainImage').src");
+  for (const readable of [true, false]) {
+    await evaluate(`document.getElementById('mainImage').src='http://127.0.0.1:${imageServer.address().port}/image.png?cors=${readable ? 1 : 0}'`);
+    await until(() => evaluate("document.getElementById('mainImage').complete && document.getElementById('mainImage').naturalWidth===2000"));
+    await evaluate(`(() => {
+      editModeTest.selectObject(0);
+      document.getElementById('canvasShell').dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));
+      window.originalCropClick=HTMLAnchorElement.prototype.click;
+      window.cropTestUrl=null;
+      HTMLAnchorElement.prototype.click=function(){window.cropTestUrl=this.href;};
+      document.getElementById('cropExportBtn').click();
+    })()`);
+    await until(() => evaluate("!document.getElementById('cropExportBtn').disabled"));
+    if (readable) {
+      assert.equal(await evaluate("!!window.cropTestUrl"), true, "cross-origin current layers export automatically when their server permits CORS");
+    } else {
+      assert.equal(await evaluate("window.cropTestUrl===null && document.getElementById('cropExportMenu').textContent.includes('浏览器禁止导出其像素')"), true, "unreadable current layers explain browser restrictions without asking to select another image");
+    }
+    await evaluate("HTMLAnchorElement.prototype.click=originalCropClick;document.getElementById('cropExportMenu').hidden=true;editModeTest.selectObject(-1)");
+  }
+  await evaluate(`document.getElementById('mainImage').src=${JSON.stringify(currentLayer)}`);
+  await until(() => evaluate("document.getElementById('mainImage').complete && document.getElementById('mainImage').naturalWidth===2000"));
   assert.equal(await evaluate(`(() => {
     const input = document.getElementById('labelFilter');
     input.value = 'sam';
@@ -324,10 +383,25 @@ const server = http.createServer((req, res) => {
     const screenshot = await call("Page.captureScreenshot", { format: "png" });
     fs.writeFileSync(path.join(artifacts, `${name}.png`), Buffer.from(screenshot.data, "base64"));
   }
+  await call("Emulation.setDeviceMetricsOverride", {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  await pause(150);
+  await evaluate("document.getElementById('labelFilter').value='edited';document.getElementById('applyFiltersBtn').click();editModeTest.selectObject(0);Object.assign(editModeTest.state,{showBoxes:false,zoom:1.7,panX:-120,panY:35});document.dispatchEvent(new Event('change'))");
+  await until(() => evaluate("document.getElementById('attrsDraftStatus').textContent.includes('已自动保存')"));
+  await call("Page.reload");
+  await until(() => evaluate("!!window.editModeTest && !!editModeTest.state.data && document.getElementById('mainImage').naturalWidth===2000 && editModeTest.state.zoom===1.7"));
+  assert.equal(await exported(), edited, "reload restores the current tab's annotation data");
+  assert.equal(await evaluate("editModeTest.state.showBoxes"), false, "reload retains display settings");
+  assert.deepEqual(await evaluate("({zoom:editModeTest.state.zoom,panX:editModeTest.state.panX,panY:editModeTest.state.panY,filter:editModeTest.state.appliedFilters.label,selection:editModeTest.state.selectedObjectIndex})"), {zoom:1.7,panX:-120,panY:35,filter:"edited",selection:0}, "reload restores the image, viewport, filter and selection");
+  const currentUrl = await evaluate("location.href");
+  await call("Page.navigate", {url:currentUrl});
+  await until(() => evaluate("!!window.editModeTest"));
+  await pause(300);
+  assert.equal(await evaluate("editModeTest.state.data"), null, "fresh navigation does not open previous work");
   assert.deepEqual(exceptions, []);
   console.log("PASS: default lock, box/handle/edge/keypoint gestures, enabled editing, undo, controls, shortcuts, pending placement, desktop/mobile screenshots");
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
   if (ws) ws.close();
   if (browser) browser.kill();
   server.close();
+  imageServer.close();
 });

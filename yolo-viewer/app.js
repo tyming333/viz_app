@@ -256,7 +256,7 @@
       state.hoverPulse = 0;
       return;
     }
-    state.hoverPulse = 0.5 + 0.5 * Math.sin(timestamp / 180);
+    state.hoverPulse = 0.5 + 0.5 * Math.sin(timestamp / 650);
     renderOverlayNow();
     state.hoverAnimationFrame = window.requestAnimationFrame(animateHoverEffect);
   }
@@ -1778,14 +1778,14 @@
     }
     overlayContext.closePath();
     overlayContext.lineWidth = (state.boxStrokeWidth + (hovered ? 1.5 + pulse : 0)) / getOverlayScale();
-    overlayContext.strokeStyle = hovered ? "#fde68a" : active ? "#facc15" : color;
+    overlayContext.strokeStyle = color;
     if (hovered) {
-      overlayContext.shadowColor = "rgba(250,204,21," + (0.38 + pulse * 0.24).toFixed(2) + ")";
+      overlayContext.shadowColor = colorWithAlpha(color, 0.38 + pulse * 0.24);
       overlayContext.shadowBlur = (5 + pulse * 5) / getOverlayScale();
     }
     if (state.showBoxFill) {
       overlayContext.fillStyle = hovered
-        ? "rgba(250,204,21," + (0.10 + pulse * 0.08).toFixed(2) + ")"
+        ? colorWithAlpha(color, Math.min(1, getBoxFillOpacity(active) * (1 + pulse * 0.6)))
         : colorWithAlpha(color, getBoxFillOpacity(active));
       overlayContext.fill();
     }
@@ -1881,7 +1881,7 @@
     overlayContext.restore();
   }
 
-  function drawHoverEdge(points, edgeIndex) {
+  function drawHoverEdge(points, edgeIndex, color) {
     if (edgeIndex < 0 || edgeIndex >= points.length) return;
     const start = points[edgeIndex];
     const end = points[(edgeIndex + 1) % points.length];
@@ -1891,8 +1891,8 @@
     overlayContext.moveTo(start[0], start[1]);
     overlayContext.lineTo(end[0], end[1]);
     overlayContext.lineWidth = (state.boxStrokeWidth + 2 + pulse * 1.5) / getOverlayScale();
-    overlayContext.strokeStyle = "rgba(253,230,138," + (0.72 + pulse * 0.2).toFixed(2) + ")";
-    overlayContext.shadowColor = "rgba(250,204,21," + (0.44 + pulse * 0.2).toFixed(2) + ")";
+    overlayContext.strokeStyle = colorWithAlpha(color, 0.72 + pulse * 0.2);
+    overlayContext.shadowColor = colorWithAlpha(color, 0.44 + pulse * 0.2);
     overlayContext.shadowBlur = (6 + pulse * 5) / getOverlayScale();
     overlayContext.stroke();
     overlayContext.restore();
@@ -1916,7 +1916,7 @@
       const hovered = active && !state.drag && !state.pan;
       if (state.showBoxes || active) {
         drawPolygon(points, color, "rgba(37,99,235,0.14)", active, hovered);
-        if (active && state.hoverTarget.kind === "edge") drawHoverEdge(points, state.hoverTarget.index);
+        if (active && state.hoverTarget.kind === "edge") drawHoverEdge(points, state.hoverTarget.index, color);
         drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
       }
       if (state.showKeypoints) {
@@ -3095,6 +3095,7 @@
     setHoverTarget({ kind: "none", index: -1 });
   });
   els.canvasShell.addEventListener("click", function onclick(event) {
+    if (event.target.closest("button, input, textarea, select")) return;
     if (state.batchPreview) return;
     if (state.suppressNextClick) {
       event.preventDefault();
@@ -3107,6 +3108,8 @@
     const hitIndex = pickObjectAtPoint(coords.x, coords.y);
     if (hitIndex >= 0) {
       selectObject(hitIndex);
+    } else {
+      cancelCanvasSelection();
     }
   }, true);
   document.addEventListener("keydown", function onkeydown(event) {

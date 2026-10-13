@@ -60,6 +60,8 @@
               <span id="jsonFileNameText" class="file-picker-name" title="未选择文件" aria-hidden="true">未选择文件</span>
             </div>
           </label>
+          <button id="clearWorkspaceBtn" type="button">清空工作内容</button>
+          <p id="attrsDraftStatus" class="attribute-message" role="status"></p>
           <!-- 保留隐藏的数据载体，供文件导入、解析和导出流程使用；不在左侧显示 JSON 文本框。 -->
           <input id="jsonInput" type="hidden" />
           <div class="progress" aria-hidden="true">
@@ -237,12 +239,8 @@
           </div>
         </div>
         <aside id="attrsPanel" class="attribute-panel" hidden>
-          <div class="panel-title"><strong>属性状态</strong><span id="attrsProgress">未配置</span></div>
-          <button id="attrsConfigureBtn" type="button">属性配置</button>
-          <p id="attrsTarget" class="attribute-target" aria-live="polite"></p>
-          <label class="field"><span>当前标注框</span><select id="attrsObjectSelect" aria-label="选择属性标注框"></select></label>
+          <div class="panel-title attribute-toolbar"><strong>属性状态</strong><span id="attrsProgress">未配置</span><button id="attrsConfigureBtn" type="button">属性配置</button></div>
           <div id="attrsChoices" class="attribute-choices"></div>
-          <button id="attrsUndoBtn" type="button" disabled>撤销上一步</button>
           <p id="attrsMessage" class="attribute-message" role="status"></p>
         </aside>
         </div>
@@ -287,6 +285,14 @@
         </section>
       </aside>
     </main>
+    <dialog id="attrsDataImportDialog" aria-labelledby="attrsDataImportTitle">
+      <h2 id="attrsDataImportTitle">导入标注 JSON</h2>
+      <label><input id="attrsReuseOnImport" type="checkbox" checked />校验并复用已有属性标注</label>
+      <p>只复用属性表中的属性及对应可选状态；未匹配的内容保留原数据。</p>
+      <button id="attrsImportConfigureBtn" type="button">导入属性配置</button>
+      <p id="attrsImportValidation" class="attribute-message" role="status"></p>
+      <div class="config-actions"><button id="attrsDataImportConfirm" type="button">确认导入</button><button id="attrsDataImportCancel" type="button">取消</button></div>
+    </dialog>
     <dialog id="attrsConfigDialog" aria-labelledby="attrsConfigTitle">
       <div class="config-heading"><h2 id="attrsConfigTitle">导入属性配置</h2><button id="attrsConfigClose" type="button" aria-label="关闭配置">关闭</button></div>
       <p>属性表仅通过 JSON 文件配置。文件格式为“属性词条: 可选状态数组”，每个词条单选。</p>

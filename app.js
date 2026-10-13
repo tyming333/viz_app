@@ -224,6 +224,147 @@
 
   const preloadImages = new Map();
   let imageWorker = null;
+  let loadingFileName = null;
+  let draftTimer = null, restoringDraft = true, draftRevision = 0;
+  let changedDuringRestore = false, applyingDraft = false;
+  let initializingViewer = true;
+  const draftSessionKey = "viz-app.viewer-session";
+  const isReload = performance.getEntriesByType("navigation")[0]?.type === "reload";
+  let draftKey;
+  try {
+    draftKey = isReload ? sessionStorage.getItem(draftSessionKey) : null;
+    if (!draftKey) draftKey = "viewer-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random());
+    sessionStorage.setItem(draftSessionKey, draftKey);
+  } catch (_) { draftKey = "viewer-" + Date.now() + "-" + Math.random(); }
+  const draftSettings = ["showBoxes", "showBoxLabels", "showAllOverlayObjects", "showContainedBoxes", "showBoxFill", "boxFillOpacity", "showKeypoints", "showKeypointLabels", "boxStrokeWidth", "labelFontSize", "imageBrightness", "imageContrast", "imageSaturation", "imageGrayscale", "imageSharpness", "labelZoom", "labelZoomSize"];
+  const draftDatabase = new Promise((resolve, reject) => {
+    const request = indexedDB.open("viz-app-drafts", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("drafts");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => reject(new Error("本地存储被其他页面占用"));
+  });
+  // Attach a rejection handler immediately, including environments that disable browser storage.
+  draftDatabase.catch(() => {});
+  async function saveDraftNow() {
+    window.clearTimeout(draftTimer);
+    draftTimer = null;
+    if (restoringDraft) return;
+    const revision = ++draftRevision;
+    try {
+      const snapshot = {
+        data: state.data, prefix: els.prefixInput.value,
+        fileName: els.jsonFileNameText.textContent,
+        currentImage: state.currentImage, objectIndex: state.selectedObjectIndex,
+        attributes: window.AttributeUI.draft(),
+        settings: Object.fromEntries(draftSettings.map(key => [key, state[key]])),
+        filters: { ...state.appliedFilters, labelExact: state.appliedFilters.labelExact.slice() },
+        view: { zoom: state.zoom, panX: state.panX, panY: state.panY }
+      };
+      const database = await draftDatabase;
+      if (revision !== draftRevision) return;
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction("drafts", "readwrite");
+        transaction.objectStore("drafts").put(snapshot, draftKey);
+        transaction.oncomplete = resolve;
+        transaction.onabort = transaction.onerror = () => reject(transaction.error || new Error("本地保存失败"));
+      });
+      if (revision === draftRevision) window.AttributeUI.draftStatus("已自动保存到本机，刷新后可恢复。", false);
+    } catch (error) {
+      window.AttributeUI.draftStatus("本地自动保存失败，请导出 JSON 保存修改：" + error.message, true);
+    }
+  }
+  function scheduleDraftSave() {
+    if (initializingViewer) return;
+    if (restoringDraft) {
+      if (!applyingDraft) changedDuringRestore = true;
+      return;
+    }
+    draftRevision += 1;
+    window.clearTimeout(draftTimer);
+    draftTimer = window.setTimeout(saveDraftNow, 0);
+    window.AttributeUI.draftStatus("正在自动保存…", false);
+  }
+  async function restoreDraft() {
+    try {
+      if (!isReload) return;
+      const database = await draftDatabase;
+      const saved = await new Promise((resolve, reject) => {
+        const request = database.transaction("drafts").objectStore("drafts").get(draftKey);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      // A newly imported file takes precedence over an asynchronous restore.
+      if (!saved || state.data || changedDuringRestore) return;
+      const result = saved.data ? validateData(saved.data) : null;
+      applyingDraft = true;
+      for (const key of draftSettings) {
+        if (saved.settings && typeof saved.settings[key] === typeof state[key]) state[key] = saved.settings[key];
+      }
+      window.AttributeUI.restoreDraft(saved.attributes);
+      els.prefixInput.value = saved.prefix || "";
+      els.jsonFileNameText.textContent = saved.fileName || "";
+      if (result) {
+        applyLoadedPayload({ data: saved.data, ...result });
+        if (state.imageNames.includes(saved.currentImage)) selectImage(saved.currentImage);
+        selectObject(saved.objectIndex);
+        if (saved.filters) {
+          state.appliedFilters = { ...state.appliedFilters, ...saved.filters, labelExact: Array.isArray(saved.filters.labelExact) ? saved.filters.labelExact : [] };
+          state.labelSelections = state.appliedFilters.labelExact.slice();
+          els.imageFilter.value = saved.filters.image || "";
+          els.labelFilter.value = saved.filters.label || "";
+          ["widthMin", "widthMax", "heightMin", "heightMax"].forEach(key => { els[key + "Filter"].value = saved.filters[key] ?? ""; });
+          state.filteredImageNames = getVisibleImageNames();
+          renderImageControls();
+          refreshLabelOptions();
+        }
+        if (saved.view && Number.isFinite(saved.view.zoom) && saved.view.zoom > 0) pendingRestoredView = { ...saved.view, image: state.currentImage };
+      }
+      renderAll();
+      applyImageAdjustments();
+      window.AttributeUI.draftStatus("已恢复本机保存的工作内容。", false);
+    } catch (error) {
+      window.AttributeUI.draftStatus("无法恢复本地工作内容：" + error.message, true);
+    } finally {
+      applyingDraft = false;
+      restoringDraft = false;
+      if (changedDuringRestore) scheduleDraftSave();
+    }
+  }
+  window.addEventListener("pagehide", saveDraftNow);
+  document.addEventListener("change", scheduleDraftSave);
+  document.addEventListener("input", scheduleDraftSave);
+  document.addEventListener("click", event => {
+    if (event.target.closest("button")) scheduleDraftSave();
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden && draftTimer !== null) saveDraftNow(); });
+  els.prefixInput.addEventListener("change", scheduleDraftSave);
+  document.getElementById("clearWorkspaceBtn").addEventListener("click", async event => {
+    if (!window.confirm("清空当前标注 JSON、属性配置和本机自动保存的工作内容？未导出的修改将丢失，请先导出需要保留的 JSON。")) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    window.clearTimeout(draftTimer);
+    draftTimer = null;
+    draftRevision += 1;
+    restoringDraft = true;
+    try {
+      const database = await draftDatabase;
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction("drafts", "readwrite");
+        transaction.objectStore("drafts").delete(draftKey);
+        transaction.oncomplete = resolve;
+        transaction.onabort = transaction.onerror = () => reject(transaction.error || new Error("清空失败"));
+      });
+      const url = new URL(window.location.href);
+      url.hash = "";
+      window.history.replaceState(null, "", url.href);
+      window.location.reload();
+    } catch (error) {
+      restoringDraft = false;
+      button.disabled = false;
+      setStatus("清空本地保存失败：" + error.message, 0);
+    }
+  });
 
   function cloneData(data) {
     return data === null || data === undefined ? data : JSON.parse(JSON.stringify(data));
@@ -232,6 +373,7 @@
   function recordUndoSnapshot() {
     if (!state.data) return;
     state.undoHistory.push(cloneData(state.data));
+    scheduleDraftSave();
   }
 
   function clearUndoHistory() {
@@ -256,7 +398,7 @@
       state.hoverPulse = 0;
       return;
     }
-    state.hoverPulse = 0.5 + 0.5 * Math.sin(timestamp / 180);
+    state.hoverPulse = 0.5 + 0.5 * Math.sin(timestamp / 650);
     renderOverlayNow();
     state.hoverAnimationFrame = window.requestAnimationFrame(animateHoverEffect);
   }
@@ -279,6 +421,7 @@
       return false;
     }
     state.data = previous;
+    scheduleDraftSave();
     state.pendingKeypointPlacement = null;
     const objects = currentObjects();
     state.selectedObjectIndex = objects.length
@@ -347,7 +490,7 @@
         if (!Array.isArray(obj.labels)) {
           obj.labels = [];
         }
-        if (!obj.attrs || typeof obj.attrs !== "object" || Array.isArray(obj.attrs)) {
+        if (!Object.prototype.hasOwnProperty.call(obj, "attrs")) {
           obj.attrs = {};
         }
         validateObjectKeypoints(name, obj, index);
@@ -952,6 +1095,7 @@
       }
     };
     reader.onload = function onload() {
+      loadingFileName = file.name;
       els.jsonInput.value = String(reader.result || "");
       setStatus("JSON 文件读取完成", 50);
       loadJson();
@@ -996,7 +1140,7 @@
         return;
       }
       if (message.type === "success") {
-        applyLoadedPayload(message.payload);
+        confirmLoadedPayload(message.payload);
       }
     });
     imageWorker.addEventListener("error", function onerror() {
@@ -1009,16 +1153,26 @@
     return imageWorker;
   }
 
+  async function confirmLoadedPayload(payload) {
+    const fileName = loadingFileName;
+    loadingFileName = null;
+    if (await window.AttributeUI.confirmImport(payload.data)) {
+      if (fileName) {
+        els.jsonFileNameText.textContent = fileName;
+        els.jsonFileNameText.title = els.jsonFileInput.title = fileName;
+      }
+      applyLoadedPayload(payload);
+    }
+    else setStatus("已取消导入，保留当前工作内容", 100);
+  }
+
   function applyLoadedPayload(payload) {
-    payload.imageNames.forEach(name => payload.data[name].det.objects.forEach(obj => {
-      try { window.AttributesCore.migrateObject(obj); }
-      catch (_) { /* The attribute panel reports malformed legacy data without overwriting it. */ }
-    }));
     cancelImageSizeScan();
     clearUndoHistory();
     state.batchPreview = false;
     state.batchOffset = 0;
     state.data = payload.data;
+    scheduleDraftSave();
     state.imageNames = payload.imageNames;
     state.filteredImageNames = payload.imageNames.slice();
     state.imageMeta = new Map(Object.entries(payload.meta));
@@ -1054,7 +1208,7 @@
       const parsed = JSON.parse(text);
       setStatus("校验数据...", 40);
       const result = validateData(parsed);
-      applyLoadedPayload({
+      confirmLoadedPayload({
         data: parsed,
         imageNames: result.imageNames,
         objectTotal: result.objectTotal,
@@ -1775,14 +1929,14 @@
     }
     overlayContext.closePath();
     overlayContext.lineWidth = (state.boxStrokeWidth + (hovered ? 1.5 + pulse : 0)) / getOverlayScale();
-    overlayContext.strokeStyle = hovered ? "#fde68a" : active ? "#facc15" : color;
+    overlayContext.strokeStyle = color;
     if (hovered) {
-      overlayContext.shadowColor = "rgba(250,204,21," + (0.38 + pulse * 0.24).toFixed(2) + ")";
+      overlayContext.shadowColor = colorWithAlpha(color, 0.38 + pulse * 0.24);
       overlayContext.shadowBlur = (5 + pulse * 5) / getOverlayScale();
     }
     if (state.showBoxFill) {
       overlayContext.fillStyle = hovered
-        ? "rgba(250,204,21," + (0.10 + pulse * 0.08).toFixed(2) + ")"
+        ? colorWithAlpha(color, Math.min(1, getBoxFillOpacity(active) * (1 + pulse * 0.6)))
         : colorWithAlpha(color, getBoxFillOpacity(active));
       overlayContext.fill();
     }
@@ -1878,7 +2032,7 @@
     overlayContext.restore();
   }
 
-  function drawHoverEdge(points, edgeIndex) {
+  function drawHoverEdge(points, edgeIndex, color) {
     if (edgeIndex < 0 || edgeIndex >= points.length) return;
     const start = points[edgeIndex];
     const end = points[(edgeIndex + 1) % points.length];
@@ -1888,8 +2042,8 @@
     overlayContext.moveTo(start[0], start[1]);
     overlayContext.lineTo(end[0], end[1]);
     overlayContext.lineWidth = (state.boxStrokeWidth + 2 + pulse * 1.5) / getOverlayScale();
-    overlayContext.strokeStyle = "rgba(253,230,138," + (0.72 + pulse * 0.2).toFixed(2) + ")";
-    overlayContext.shadowColor = "rgba(250,204,21," + (0.44 + pulse * 0.2).toFixed(2) + ")";
+    overlayContext.strokeStyle = colorWithAlpha(color, 0.72 + pulse * 0.2);
+    overlayContext.shadowColor = colorWithAlpha(color, 0.44 + pulse * 0.2);
     overlayContext.shadowBlur = (6 + pulse * 5) / getOverlayScale();
     overlayContext.stroke();
     overlayContext.restore();
@@ -1913,7 +2067,7 @@
       const hovered = active && !state.drag && !state.pan;
       if (state.showBoxes || active) {
         drawPolygon(points, color, "rgba(37,99,235,0.14)", active, hovered);
-        if (active && state.hoverTarget.kind === "edge") drawHoverEdge(points, state.hoverTarget.index);
+        if (active && state.hoverTarget.kind === "edge") drawHoverEdge(points, state.hoverTarget.index, color);
         drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
       }
       if (state.showKeypoints) {
@@ -2033,6 +2187,7 @@
   }
 
   function selectImage(name, options) {
+    scheduleDraftSave();
     const nextName = name || "";
     if (nextName && nextName === state.currentImage) {
       updateImageSelection();
@@ -2085,6 +2240,7 @@
   }
 
   function selectObject(index) {
+    scheduleDraftSave();
     if (state.pendingKeypointPlacement && state.pendingKeypointPlacement.objectIndex !== index) {
       state.pendingKeypointPlacement = null;
     }
@@ -2114,6 +2270,7 @@
     renderBoxVisibilityToggle();
     renderOverlay();
     if (hadSelection) setStatus("已取消选中", 100);
+    if (hadSelection) scheduleDraftSave();
     return hadSelection;
   }
 
@@ -2376,6 +2533,7 @@
     event.preventDefault();
     const factor = Math.exp(-event.deltaY * 0.0015);
     zoomAt(event.clientX, event.clientY, state.zoom * factor);
+    scheduleDraftSave();
   }
 
   function getImageCoordsFromClient(clientX, clientY) {
@@ -2514,6 +2672,7 @@
 
   function endPan() {
     state.drag = null;
+    scheduleDraftSave();
     if (!state.pan) return;
     state.pan = null;
     els.canvasShell.classList.remove("is-panning");
@@ -2570,6 +2729,7 @@
     applyViewTransform();
   }
 
+  let pendingRestoredView = null;
   function resetView() {
     if (state.labelZoom) {
       focusLabelsView();
@@ -2818,10 +2978,6 @@
   });
   els.jsonFileInput.addEventListener("change", function onchange(event) {
     const file = event.target.files[0];
-    const name = file ? file.name : "未选择文件";
-    els.jsonFileNameText.textContent = name;
-    els.jsonFileNameText.title = name;
-    els.jsonFileInput.title = name;
     readJsonFile(file);
   });
   els.applyFiltersBtn.addEventListener("click", applyFilters);
@@ -2916,7 +3072,14 @@
         renderImageControls();
       }
     }
-    resetView();
+    if (pendingRestoredView && pendingRestoredView.image === state.currentImage) {
+      Object.assign(state, { zoom: pendingRestoredView.zoom, panX: pendingRestoredView.panX, panY: pendingRestoredView.panY });
+      pendingRestoredView = null;
+      applyViewTransform();
+    } else {
+      pendingRestoredView = null;
+      resetView();
+    }
     renderSwitchChrome();
     if (state.sizeScanActive) {
       updateImageSizeScanStatus();
@@ -3097,6 +3260,7 @@
     setHoverTarget({ kind: "none", index: -1 });
   });
   els.canvasShell.addEventListener("click", function onclick(event) {
+    if (event.target.closest("button, input, textarea, select")) return;
     if (state.batchPreview) return;
     if (state.suppressNextClick) {
       event.preventDefault();
@@ -3109,6 +3273,8 @@
     const hitIndex = pickObjectAtPoint(coords.x, coords.y);
     if (hitIndex >= 0) {
       selectObject(hitIndex);
+    } else {
+      cancelCanvasSelection();
     }
   }, true);
   document.addEventListener("keydown", function onkeydown(event) {
@@ -3151,10 +3317,13 @@
   window.AttributeUI.attach({
     object: currentObject,
     objects: currentObjects,
+    data: () => state.data,
+    allObjects: () => Object.entries(state.data || {}).flatMap(([image, entry]) => entry.det.objects.map((object, index) => ({ image, index, object }))),
     index: () => state.selectedObjectIndex,
     batchPreview: () => state.batchPreview,
     canUndo: () => state.undoHistory.size() > 0,
     recordUndo: recordUndoSnapshot,
+    saveDraft: scheduleDraftSave,
     undo: undoLastChange,
     selectObject: selectObject,
     selectFirst: () => selectObject(currentObjects().findIndex(obj => matchesAppliedOverlayFilter(obj))),
@@ -3170,4 +3339,6 @@
   }));
   renderFull();
   applyImageAdjustments();
+  initializingViewer = false;
+  restoreDraft();
 })();

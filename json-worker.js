@@ -65,7 +65,7 @@ function validateData(data) {
       if (!Array.isArray(obj.labels)) {
         obj.labels = [];
       }
-      if (!obj.attrs || typeof obj.attrs !== "object" || Array.isArray(obj.attrs)) {
+      if (!Object.prototype.hasOwnProperty.call(obj, "attrs")) {
         obj.attrs = {};
       }
       validateObjectKeypoints(name, obj, j);

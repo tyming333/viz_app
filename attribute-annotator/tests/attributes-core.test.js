@@ -3,6 +3,15 @@ const assert = require("node:assert/strict");
 const core = require("../attributes-core.js");
 const table = { "螺母轮廓及棱角": ["清晰", "基本可辨", "不可辨"], "螺杆轮廓": ["清晰", "基本可辨", "不可辨"] };
 const config = core.normalizeConfig(table);
+test("reuse validates partial attrs, reports unknown names and preserves source data", () => {
+  const obj = {attrs: {box_type: "rectangle", "螺杆轮廓": "清晰", "其他属性": "旧值", count: 2}};
+  const before = structuredClone(obj);
+  assert.deepEqual(core.validateExisting(obj, config), {values: {"螺杆轮廓": "清晰"}, errors: [], unmatched: ["其他属性"]});
+  assert.deepEqual(obj, before);
+  assert.equal(core.validateExisting({attrs: {"螺杆轮廓": "配置外状态"}}, config).errors.length, 1);
+  assert.deepEqual(core.validateExisting({}, config).values, {});
+  for (const attrs of [null, [], "清晰"]) assert.throws(() => core.validateExisting({attrs}, config), /attrs/);
+});
 test("keyed configurations round trip with repeated states across attributes", () => {
   assert.deepEqual(core.exportConfig(config), table);
   assert.deepEqual(core.normalizeConfig(JSON.parse(JSON.stringify(core.exportConfig(config)))), config);
@@ -21,7 +30,7 @@ test("each attribute stores one independent state while preserving unrelated fie
   assert.deepEqual(core.choose(undefined, config.groups[0], "清晰"), { "螺母轮廓及棱角": "清晰" });
   assert.deepEqual(core.choose({ "螺母轮廓及棱角": "旧状态" }, config.groups[0], "不可辨"), { "螺母轮廓及棱角": "不可辨" });
 });
-test("malformed annotations and legacy arrays cannot be silently overwritten", () => {
+test("malformed attrs cannot be silently overwritten", () => {
   for (const value of [null, "正常", ["清晰"]]) assert.throws(() => core.choose(value, config.groups[0], "清晰"), /attrs/);
   assert.throws(() => core.choose({}, config.groups[0], "配置外名称"), /配置/);
   assert.deepEqual(core.read({}), {});
@@ -51,20 +60,4 @@ test("attrs edits preserve existing metadata of any JSON type", () => {
   const after = core.choose(before, config.groups[0], "清晰");
   assert.deepEqual(after, {...before, "螺母轮廓及棱角":"清晰"});
   assert.deepEqual(core.choose(after, config.groups[0], null), before);
-});
-test("legacy score_attrs migrates into attrs with existing attrs taking precedence", () => {
-  const obj = {attrs:{box_type:"rectangle", 曝光:"正常", count:2}, score_attrs:{曝光:"轻微过曝", 螺母数量:"存疑"}};
-  core.migrateObject(obj);
-  assert.deepEqual(obj, {attrs:{曝光:"正常", 螺母数量:"存疑", box_type:"rectangle", count:2}});
-  core.migrateObject(obj);
-  assert.equal("score_attrs" in obj,false);
-});
-test("malformed legacy attributes remain intact and are reported", () => {
-  for (const legacy of [null, ["清晰"], {轮廓:1}, {轮廓:""}]) {
-    const obj={attrs:{box_type:"rectangle"},score_attrs:legacy};
-    const before=structuredClone(obj);
-    assert.throws(()=>core.migrateObject(obj), /score_attrs/);
-    assert.throws(()=>core.readObject(obj), /score_attrs/);
-    assert.deepEqual(obj,before);
-  }
 });

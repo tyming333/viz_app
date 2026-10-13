@@ -54,19 +54,7 @@
     return { ...value };
   }
   function readObject(obj) {
-    const attrs = read(obj.attrs);
-    if (!Object.prototype.hasOwnProperty.call(obj, "score_attrs")) return attrs;
-    const legacy = obj.score_attrs;
-    if (!legacy || Array.isArray(legacy) || typeof legacy !== "object" || Object.values(legacy).some(value => typeof value !== "string" || !value.trim())) {
-      throw new Error("旧 score_attrs 不是“属性词条: 状态”对象，请先核对原始数据；未覆盖已有内容");
-    }
-    return { ...legacy, ...attrs };
-  }
-  function migrateObject(obj) {
-    if (!Object.prototype.hasOwnProperty.call(obj, "score_attrs")) return;
-    const attrs = readObject(obj);
-    obj.attrs = attrs;
-    delete obj.score_attrs;
+    return read(obj.attrs);
   }
   function choose(value, group, option) {
     const selected = read(value);
@@ -77,6 +65,18 @@
     if (option === null) delete next[group.name];
     return next;
   }
-  return { normalizeConfig: normalizeConfig, exportConfig: exportConfig, read: read, readObject: readObject, migrateObject: migrateObject, choose: choose,
+  function validateExisting(obj, config) {
+    const selected = readObject(obj);
+    const groups = normalizeConfig(config).groups;
+    const errors = [], values = {};
+    groups.forEach(group => {
+      if (!Object.prototype.hasOwnProperty.call(selected, group.name)) return;
+      if (!group.options.includes(selected[group.name])) errors.push(group.name + "：状态不在配置中");
+      else Object.defineProperty(values, group.name, { value: selected[group.name], enumerable: true });
+    });
+    const unmatched = Object.keys(selected).filter(name => name !== "box_type" && typeof selected[name] === "string" && !groups.some(group => group.name === name));
+    return { values, errors, unmatched };
+  }
+  return { normalizeConfig: normalizeConfig, exportConfig: exportConfig, read: read, readObject: readObject, choose: choose, validateExisting: validateExisting,
     defaultConfig: function () { return normalizeConfig(defaultTable); } };
 });

@@ -44,21 +44,6 @@
     button.textContent = "裁剪导出 PNG";
     button.type = "button";
     menu.append(button, output);
-    const fileInput = document.createElement("input"), fileButton = document.createElement("button");
-    fileInput.type = "file";
-    fileInput.accept = "image/*";
-    fileInput.hidden = true;
-    fileButton.type = "button";
-    fileButton.textContent = "选择原图后裁剪";
-    fileButton.hidden = true;
-    menu.append(fileButton, fileInput);
-    fileButton.addEventListener("click", () => fileInput.click());
-    let originalFile = null;
-    fileInput.addEventListener("change", () => {
-      originalFile = fileInput.files[0] || null;
-      if (originalFile) button.click();
-      fileInput.value = "";
-    });
     document.body.append(menu);
     function savePadding() {
       const next = {};
@@ -80,9 +65,8 @@
       const obj = viewer.object();
       if (!obj || viewer.batchPreview()) return;
       event.preventDefault();
-      target = { bbox: obj.bbox.slice(), image: viewer.imageName(), index: viewer.index() };
-      originalFile = null;
-      fileButton.hidden = true;
+      const loaded = document.getElementById("mainImage");
+      target = { bbox: obj.bbox.slice(), image: viewer.imageName(), source: loaded.currentSrc, index: viewer.index() };
       output.textContent = "";
       menu.hidden = false;
       menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + "px";
@@ -92,22 +76,30 @@
     document.addEventListener("keydown", event => {
       if (!menu.hidden && event.key === "Escape") { menu.hidden = true; event.stopImmediatePropagation(); event.preventDefault(); }
     }, true);
+    async function loadReadableImage(source) {
+      const url = new URL(source, location.href);
+      if (!/^https?:$/.test(url.protocol) || url.origin === location.origin) return null;
+      // Retry the same displayed image using CORS when its server permits pixel access.
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        const timer = setTimeout(() => { image.src = ""; reject(new DOMException("图片服务器未允许读取像素", "SecurityError")); }, 10000);
+        image.crossOrigin = "anonymous";
+        image.onload = () => { clearTimeout(timer); resolve(image); };
+        image.onerror = () => { clearTimeout(timer); reject(new DOMException("图片服务器未允许读取像素", "SecurityError")); };
+        image.src = source;
+      });
+    }
     button.addEventListener("click", async () => {
       if (!target || !savePadding()) return;
       const selected = target, ratios = { ...padding };
       button.disabled = true;
       let bitmap;
       try {
-        if (originalFile) bitmap = await createImageBitmap(originalFile);
-        else {
-          const loaded = document.getElementById("mainImage");
-          if (selected.image === viewer.imageName() && loaded.complete && loaded.naturalWidth > 0) {
-            try { bitmap = await createImageBitmap(loaded); }
-            catch (_) { bitmap = await createImageBitmap(await viewer.readImage(selected.image)); }
-          } else {
-            bitmap = await createImageBitmap(await viewer.readImage(selected.image));
-          }
+        const loaded = document.getElementById("mainImage");
+        if (selected.image !== viewer.imageName() || selected.source !== loaded.currentSrc || !loaded.complete || !loaded.naturalWidth) {
+          throw new Error("当前图层已切换或尚未加载完成，请等待当前图片加载后重新右键导出");
         }
+        bitmap = await createImageBitmap(loaded);
         const xs = selected.bbox.filter((_, i) => i % 2 === 0), ys = selected.bbox.filter((_, i) => i % 2 === 1);
         const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
         const width = maxX - minX, height = maxY - minY;
@@ -120,7 +112,19 @@
         canvas.width = right - left;
         canvas.height = bottom - top;
         canvas.getContext("2d").drawImage(bitmap, left, top, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-        const cropped = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        let cropped;
+        try {
+          cropped = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        } catch (error) {
+          if (error.name !== "SecurityError") throw error;
+          const readable = await loadReadableImage(selected.source);
+          if (!readable) throw error;
+          // Resetting dimensions clears the tainted canvas before drawing the readable source.
+          canvas.width = right - left;
+          canvas.height = bottom - top;
+          canvas.getContext("2d").drawImage(readable, left, top, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+          cropped = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+        }
         if (!cropped) throw new Error("裁剪生成失败");
         const url = URL.createObjectURL(cropped), link = document.createElement("a");
         const name = selected.image.split(/[\\/]/).pop().replace(/\.[^.]*$/, "").replace(/[<>:"|?*]/g, "_");
@@ -132,8 +136,9 @@
         setTimeout(() => URL.revokeObjectURL(url), 10000);
         output.textContent = "已导出 " + canvas.width + " × " + canvas.height;
       } catch (error) {
-        fileButton.hidden = false;
-        output.textContent = "浏览器无法读取原图像素，请点击“选择原图后裁剪”选择当前图片。";
+        output.textContent = error.name === "SecurityError"
+          ? "当前图片可显示，但浏览器禁止导出其像素，需要通过同源图片地址加载后裁剪。"
+          : "裁剪失败：" + error.message;
       }
       finally { bitmap?.close(); button.disabled = false; }
     });
