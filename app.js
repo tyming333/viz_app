@@ -2739,6 +2739,20 @@
     const button = event.target.closest ? event.target.closest("button[data-object-index]") : null;
     if (!button || !els.objectList.contains(button)) return;
     selectObject(Number(button.dataset.objectIndex));
+    const obj = currentObject();
+    if (!obj || state.batchPreview || !els.mainImage.complete
+      || !(els.mainImage.naturalWidth > 0)) return;
+    const canvasWidth = els.canvasShell.clientWidth;
+    const canvasHeight = els.canvasShell.clientHeight;
+    if (els.mainImage.naturalWidth * state.zoom <= canvasWidth
+      && els.mainImage.naturalHeight * state.zoom <= canvasHeight) return;
+    const xs = obj.bbox.filter((_, index) => index % 2 === 0);
+    const ys = obj.bbox.filter((_, index) => index % 2 === 1);
+    const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    state.panX = canvasWidth / 2 - centerX * state.zoom;
+    state.panY = canvasHeight / 2 - centerY * state.zoom;
+    applyViewTransform();
   }
 
   function stopPointerBubble(event) {
