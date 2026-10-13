@@ -447,16 +447,16 @@ textarea {
 
 .label-filter-chip {
   display: inline-flex;
-  height: 20px;
+  min-height: 0;
+  height: auto;
   max-width: 100%;
   flex: 0 0 auto;
   align-items: center;
-  gap: 3px;
   border: 1px solid #93c5fd;
-  border-radius: 4px;
+  border-radius: 999px;
   background: #dbeafe;
   color: #1d4ed8;
-  padding: 0 4px;
+  padding: 0 1px;
   font-size: var(--font-body);
 }
 
@@ -465,12 +465,6 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.label-filter-chip-remove {
-  flex: 0 0 auto;
-  font-size: var(--font-body);
-  line-height: 1;
 }
 
 .label-multiselect-menu.label-filter-menu {
@@ -1474,10 +1468,6 @@ textarea {
 
 .sidebar .label-filter-field input {
   height: 20px;
-}
-
-.sidebar .label-filter-chip {
-  height: 18px;
 }
 
 .sidebar .filter-note button {

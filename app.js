@@ -752,15 +752,12 @@
       chip.className = "label-filter-chip";
       chip.dataset.labelValue = value;
       chip.title = "取消选择 " + labelOptionText(value);
+      chip.setAttribute("aria-label", chip.title);
 
       const text = document.createElement("span");
       text.className = "label-filter-chip-text";
       text.textContent = labelOptionText(value);
-      const remove = document.createElement("span");
-      remove.className = "label-filter-chip-remove";
-      remove.textContent = "×";
-      remove.setAttribute("aria-hidden", "true");
-      chip.append(text, remove);
+      chip.append(text);
       fragment.appendChild(chip);
     });
     els.labelFilterSelections.replaceChildren(fragment);
