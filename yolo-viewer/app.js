@@ -2738,7 +2738,12 @@
   function handleObjectListClick(event) {
     const button = event.target.closest ? event.target.closest("button[data-object-index]") : null;
     if (!button || !els.objectList.contains(button)) return;
-    selectObject(Number(button.dataset.objectIndex));
+    const index = Number(button.dataset.objectIndex);
+    if (index === state.selectedObjectIndex) {
+      cancelCanvasSelection();
+      return;
+    }
+    selectObject(index);
     const obj = currentObject();
     if (!obj || state.batchPreview || !els.mainImage.complete
       || !(els.mainImage.naturalWidth > 0)) return;

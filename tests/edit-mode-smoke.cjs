@@ -186,9 +186,11 @@ const server = http.createServer((req, res) => {
   assert.equal(await evaluate(`(() => {
     const s=editModeTest.state, canvas=document.getElementById('canvasShell');
     const original={zoom:s.zoom,panX:s.panX,panY:s.panY,index:s.selectedObjectIndex};
+    editModeTest.selectObject(-1);
     document.querySelector('#objectList button[data-object-index="0"]').click();
     const unchanged=s.zoom===original.zoom && s.panX===original.panX && s.panY===original.panY;
     s.zoom=3;
+    editModeTest.selectObject(-1);
     document.querySelector('#objectList button[data-object-index="0"]').click();
     const centered=s.zoom===3 && Math.abs(s.panX+200*s.zoom-canvas.clientWidth/2)<0.01
       && Math.abs(s.panY+180*s.zoom-canvas.clientHeight/2)<0.01;
@@ -196,6 +198,22 @@ const server = http.createServer((req, res) => {
     editModeTest.selectObject(original.index);
     return unchanged && centered;
   })()`), true, "Objects clicks center oversized images without changing zoom or fitted views");
+  assert.equal(await evaluate(`(async () => {
+    const s=editModeTest.state;
+    const originalVisibility=s.showBoxes;
+    for (const visible of [false,true]) {
+      s.showBoxes=visible;
+      editModeTest.selectObject(-1);
+      document.querySelector('#objectList button[data-object-index="0"]').click();
+      if(s.selectedObjectIndex!==0)return false;
+      const panX=s.panX,panY=s.panY;
+      document.querySelector('#objectList button[data-object-index="0"]').click();
+      await new Promise(r=>setTimeout(r,50));
+      if(s.selectedObjectIndex!==-1 || s.showBoxes!==visible || s.hoverAnimationFrame!==0 || s.panX!==panX || s.panY!==panY)return false;
+    }
+    s.showBoxes=originalVisibility;
+    return true;
+  })()`), true, "repeated Objects clicks cancel highlighting without changing global visibility or view");
   assert.equal(await evaluate(`(async () => {
     editModeTest.selectObject(0);
     const canvas=document.getElementById('canvasShell');
