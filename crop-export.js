@@ -14,7 +14,7 @@
     menu.hidden = true;
     menu.setAttribute("role", "dialog");
     menu.setAttribute("aria-label", "裁剪导出配置");
-    Object.assign(menu.style, { position: "fixed", zIndex: "1000", background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", borderRadius: "6px", padding: "12px", boxShadow: "0 4px 20px #0003", width: "240px", maxWidth: "calc(100vw - 16px)" });
+    Object.assign(menu.style, { position: "fixed", zIndex: "1000", background: "var(--surface)", color: "var(--text)", border: "1px solid var(--line)", borderRadius: "6px", padding: "12px", boxShadow: "0 4px 20px #0003", width: "240px", maxWidth: "calc(100vw - 16px)", maxHeight: "calc(100vh - 16px)", overflowY: "auto" });
     const title = document.createElement("strong");
     title.textContent = "裁剪导出 · 扩框比例";
     menu.append(title);
@@ -43,8 +43,103 @@
     button.id = "cropExportBtn";
     button.textContent = "裁剪导出 PNG";
     button.type = "button";
-    menu.append(button, output);
+    const fallback = document.createElement("div");
+    fallback.id = "cropOriginalFallback";
+    fallback.hidden = true;
+    const pathLabel = document.createElement("label"), pathInput = document.createElement("input");
+    pathInput.id = "cropOriginalPath";
+    pathInput.type = "text";
+    pathInput.readOnly = true;
+    pathInput.setAttribute("aria-label", "当前原图路径");
+    pathInput.style.width = "100%";
+    pathLabel.textContent = "当前原图路径";
+    pathLabel.append(pathInput);
+    const copyButton = document.createElement("button"), fileButton = document.createElement("button"), fileInput = document.createElement("input");
+    copyButton.id = "cropCopyPathBtn";
+    copyButton.type = fileButton.type = "button";
+    copyButton.textContent = "复制路径";
+    fileButton.id = "cropChooseOriginalBtn";
+    fileButton.textContent = "选择原图后裁剪";
+    fileInput.id = "cropOriginalFile";
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.hidden = true;
+    const help = document.createElement("p");
+    fallback.append(pathLabel, copyButton, fileButton, fileInput, help);
+    menu.append(button, fallback, output);
     document.body.append(menu);
+    function positionMenu(x, y) {
+      menu.style.left = Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8)) + "px";
+      menu.style.top = Math.max(8, Math.min(y, innerHeight - menu.offsetHeight - 8)) + "px";
+    }
+    const confirmedFiles = new Map();
+    let choosingTarget = null;
+    function updatePath(selected) {
+      const localPath = window.ViewerCore.getLocalImagePath(selected.source);
+      pathInput.value = localPath || selected.image;
+      pathInput.title = pathInput.value;
+      copyButton.hidden = !localPath;
+      help.textContent = localPath
+        ? "选择时会尝试复制路径。在文件窗口的“文件名”中粘贴后确认；也可手动复制上方路径。"
+        : "请在文件窗口中选择当前图层对应的原图。";
+    }
+    async function copyPath() {
+      try {
+        await navigator.clipboard.writeText(pathInput.value);
+        output.textContent = "路径已复制，在文件窗口中粘贴后确认。";
+        return true;
+      } catch (_) {
+        pathInput.focus();
+        pathInput.select();
+        try {
+          if (document.execCommand("copy")) {
+            output.textContent = "路径已复制，在文件窗口中粘贴后确认。";
+            return true;
+          }
+        } catch (_) {}
+        output.textContent = "路径已选中，请按 Ctrl+C 复制，再选择原图。";
+        return false;
+      }
+    }
+    copyButton.addEventListener("click", copyPath);
+    fileButton.addEventListener("click", async () => {
+      if (!target || button.disabled) return;
+      const selected = target;
+      if (window.ViewerCore.getLocalImagePath(selected.source)) {
+        await copyPath();
+      }
+      if (target !== selected) return;
+      choosingTarget = selected;
+      fileInput.click();
+    });
+    fileInput.addEventListener("change", async () => {
+      const file = fileInput.files[0], selected = choosingTarget;
+      fileInput.value = "";
+      choosingTarget = null;
+      if (!file || !selected) return;
+      button.disabled = fileButton.disabled = true;
+      let original, accepted = false;
+      try {
+        if (target !== selected || selected.image !== viewer.imageName() || selected.source !== document.getElementById("mainImage").currentSrc) {
+          throw new Error("当前图层已切换，请重新选择原图");
+        }
+        const sourceName = decodeURIComponent(new URL(selected.source, location.href).pathname.split("/").pop());
+        if (sourceName && file.name.normalize("NFC").toLocaleLowerCase() !== sourceName.normalize("NFC").toLocaleLowerCase()) {
+          throw new Error("所选文件不是当前原图，请选择 “" + sourceName + "”");
+        }
+        original = await createImageBitmap(file);
+        if (original.width !== selected.width || original.height !== selected.height) {
+          throw new Error("所选原图尺寸与当前图层不一致，请重新确认原图");
+        }
+        if (target !== selected || selected.image !== viewer.imageName() || selected.source !== document.getElementById("mainImage").currentSrc) {
+          throw new Error("当前图层已切换，请重新选择原图");
+        }
+        confirmedFiles.set(selected.source, file);
+        accepted = true;
+      } catch (error) { output.textContent = "原图确认失败：" + error.message; }
+      finally { original?.close(); button.disabled = fileButton.disabled = false; positionMenu(parseFloat(menu.style.left), parseFloat(menu.style.top)); }
+      if (accepted) button.click();
+    });
     function savePadding() {
       const next = {};
       for (const key of Object.keys(padding)) {
@@ -66,11 +161,12 @@
       if (!obj || viewer.batchPreview()) return;
       event.preventDefault();
       const loaded = document.getElementById("mainImage");
-      target = { bbox: obj.bbox.slice(), image: viewer.imageName(), source: loaded.currentSrc, index: viewer.index() };
+      target = { bbox: obj.bbox.slice(), image: viewer.imageName(), source: loaded.currentSrc, width: loaded.naturalWidth, height: loaded.naturalHeight, index: viewer.index() };
       output.textContent = "";
+      fallback.hidden = true;
+      updatePath(target);
       menu.hidden = false;
-      menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + "px";
-      menu.style.top = Math.max(8, Math.min(event.clientY, innerHeight - menu.offsetHeight - 8)) + "px";
+      positionMenu(event.clientX, event.clientY);
     });
     document.addEventListener("pointerdown", event => { if (!menu.contains(event.target)) menu.hidden = true; });
     document.addEventListener("keydown", event => {
@@ -99,7 +195,8 @@
         if (selected.image !== viewer.imageName() || selected.source !== loaded.currentSrc || !loaded.complete || !loaded.naturalWidth) {
           throw new Error("当前图层已切换或尚未加载完成，请等待当前图片加载后重新右键导出");
         }
-        bitmap = await createImageBitmap(loaded);
+        const confirmed = confirmedFiles.get(selected.source);
+        bitmap = await createImageBitmap(confirmed || loaded);
         const xs = selected.bbox.filter((_, i) => i % 2 === 0), ys = selected.bbox.filter((_, i) => i % 2 === 1);
         const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
         const width = maxX - minX, height = maxY - minY;
@@ -134,13 +231,15 @@
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 10000);
+        fallback.hidden = true;
         output.textContent = "已导出 " + canvas.width + " × " + canvas.height;
       } catch (error) {
+        fallback.hidden = error.name !== "SecurityError";
         output.textContent = error.name === "SecurityError"
-          ? "当前图片可显示，但浏览器禁止导出其像素，需要通过同源图片地址加载后裁剪。"
+          ? "浏览器禁止导出其像素，请确认一次当前原图；确认后本页面可复用。"
           : "裁剪失败：" + error.message;
       }
-      finally { bitmap?.close(); button.disabled = false; }
+      finally { bitmap?.close(); button.disabled = false; positionMenu(parseFloat(menu.style.left), parseFloat(menu.style.top)); }
     });
   };
 })();

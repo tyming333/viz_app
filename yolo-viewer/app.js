@@ -2931,7 +2931,11 @@
     renderOverlay();
     setStatus("图片加载失败，请检查 prefix: " + state.currentImage, 0);
   });
-  els.resetViewBtn.addEventListener("click", resetView);
+  els.resetViewBtn.addEventListener("click", function resetCanvasView() {
+    state.labelZoom = false;
+    renderLabelZoomControls();
+    resetImageView();
+  });
   els.labelZoomBtn.addEventListener("click", toggleLabelZoom);
   els.labelZoomSizeInput.addEventListener("change", function onLabelZoomSizeChange(event) {
     updateLabelZoomSize(event.target.value);

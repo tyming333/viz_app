@@ -50,6 +50,17 @@
       : normalizeImagePrefix(prefix) + imagePathToUrl(name);
   }
 
+  function getLocalImagePath(source) {
+    try {
+      const url = new URL(source);
+      if (url.protocol !== "file:") return null;
+      const path = decodeURIComponent(url.pathname);
+      if (url.hostname) return ("//" + url.hostname + path).replace(/\//g, "\\");
+      if (/^\/[a-z]:\//i.test(path)) return path.slice(1).replace(/\//g, "\\");
+      return path;
+    } catch (_) { return null; }
+  }
+
   function getImageAdjustmentFilter(settings) {
     const values = settings || {};
     const filter =
@@ -412,6 +423,7 @@
     imagePathToUrl,
     normalizeImagePrefix,
     buildImageUrl,
+    getLocalImagePath,
     getSharpenKernel,
     normalizeLabelZoomSize,
     getLabelZoomBounds,

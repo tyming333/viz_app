@@ -23,8 +23,17 @@ const {
   matchesOverlayLabelFilter,
   isCancelSelectionKey,
   getContainTransform,
-  isBboxContained
+  isBboxContained,
+  getLocalImagePath
 } = require("../viewer-core.js");
+
+test("local image paths decode the actual displayed URL for file confirmation", () => {
+  assert.equal(getLocalImagePath("file:///D:/dataset/%E8%9E%BA%E6%AF%8D%20%23100%25.png"), "D:\\dataset\\螺母 #100%.png");
+  assert.equal(getLocalImagePath("file://192.168.1.20/%E5%85%B1%E4%BA%AB/a%20b.jpg"), "\\\\192.168.1.20\\共享\\a b.jpg");
+  assert.equal(getLocalImagePath("file:///home/user/images/a%20b.png"), "/home/user/images/a b.png");
+  assert.equal(getLocalImagePath("https://example.test/a.png"), null);
+  assert.equal(getLocalImagePath("file:///D:/invalid%ZZ.png"), null);
+});
 
 test("detects boxes fully contained by the selected box", () => {
   const outer = [10, 10, 90, 10, 90, 90, 10, 90];

@@ -236,7 +236,7 @@
     if (!draftKey) draftKey = "viewer-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random());
     sessionStorage.setItem(draftSessionKey, draftKey);
   } catch (_) { draftKey = "viewer-" + Date.now() + "-" + Math.random(); }
-  const draftSettings = ["showBoxes", "showBoxLabels", "showAllOverlayObjects", "showContainedBoxes", "showBoxFill", "boxFillOpacity", "showKeypoints", "showKeypointLabels", "boxStrokeWidth", "labelFontSize", "imageBrightness", "imageContrast", "imageSaturation", "imageGrayscale", "imageSharpness", "labelZoom", "labelZoomSize"];
+  const draftSettings = ["showBoxes", "showBoxLabels", "showAllOverlayObjects", "showContainedBoxes", "showBoxFill", "boxFillOpacity", "showKeypoints", "showKeypointLabels", "boxStrokeWidth", "labelFontSize", "imageBrightness", "imageContrast", "imageSaturation", "imageGrayscale", "imageSharpness", "labelZoomSize"];
   const draftDatabase = new Promise((resolve, reject) => {
     const request = indexedDB.open("viz-app-drafts", 1);
     request.onupgradeneeded = () => request.result.createObjectStore("drafts");
@@ -258,8 +258,7 @@
         currentImage: state.currentImage, objectIndex: state.selectedObjectIndex,
         attributes: window.AttributeUI.draft(),
         settings: Object.fromEntries(draftSettings.map(key => [key, state[key]])),
-        filters: { ...state.appliedFilters, labelExact: state.appliedFilters.labelExact.slice() },
-        view: { zoom: state.zoom, panX: state.panX, panY: state.panY }
+        filters: { ...state.appliedFilters, labelExact: state.appliedFilters.labelExact.slice() }
       };
       const database = await draftDatabase;
       if (revision !== draftRevision) return;
@@ -318,7 +317,6 @@
           renderImageControls();
           refreshLabelOptions();
         }
-        if (saved.view && Number.isFinite(saved.view.zoom) && saved.view.zoom > 0) pendingRestoredView = { ...saved.view, image: state.currentImage };
       }
       renderAll();
       applyImageAdjustments();
@@ -2533,7 +2531,6 @@
     event.preventDefault();
     const factor = Math.exp(-event.deltaY * 0.0015);
     zoomAt(event.clientX, event.clientY, state.zoom * factor);
-    scheduleDraftSave();
   }
 
   function getImageCoordsFromClient(clientX, clientY) {
@@ -2729,7 +2726,6 @@
     applyViewTransform();
   }
 
-  let pendingRestoredView = null;
   function resetView() {
     if (state.labelZoom) {
       focusLabelsView();
@@ -3072,14 +3068,7 @@
         renderImageControls();
       }
     }
-    if (pendingRestoredView && pendingRestoredView.image === state.currentImage) {
-      Object.assign(state, { zoom: pendingRestoredView.zoom, panX: pendingRestoredView.panX, panY: pendingRestoredView.panY });
-      pendingRestoredView = null;
-      applyViewTransform();
-    } else {
-      pendingRestoredView = null;
-      resetView();
-    }
+    resetView();
     renderSwitchChrome();
     if (state.sizeScanActive) {
       updateImageSizeScanStatus();
@@ -3096,7 +3085,11 @@
     renderOverlay();
     setStatus("图片加载失败，请检查 prefix: " + state.currentImage, 0);
   });
-  els.resetViewBtn.addEventListener("click", resetView);
+  els.resetViewBtn.addEventListener("click", function resetCanvasView() {
+    state.labelZoom = false;
+    renderLabelZoomControls();
+    resetImageView();
+  });
   els.labelZoomBtn.addEventListener("click", toggleLabelZoom);
   els.labelZoomSizeInput.addEventListener("change", function onLabelZoomSizeChange(event) {
     updateLabelZoomSize(event.target.value);

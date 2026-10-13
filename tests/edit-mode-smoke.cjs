@@ -49,7 +49,7 @@ const server = http.createServer((req, res) => {
   ws = new WebSocket(pages.find(page => page.type === "page").webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { ws.addEventListener("open", resolve, { once: true }); ws.addEventListener("error", reject, { once: true }); });
   let nextId = 0;
-  const pending = new Map(), exceptions = [];
+  const pending = new Map(), exceptions = [], fileChoosers = [];
   ws.addEventListener("message", event => {
     const message = JSON.parse(event.data);
     if (message.id) {
@@ -58,6 +58,7 @@ const server = http.createServer((req, res) => {
       pending.delete(message.id);
       if (message.error) entry.reject(new Error(message.error.message)); else entry.resolve(message.result);
     } else if (message.method === "Runtime.exceptionThrown") exceptions.push(message.params.exceptionDetails);
+    else if (message.method === "Page.fileChooserOpened") fileChoosers.push(message.params);
   });
   const call = (method, params = {}) => new Promise((resolve, reject) => {
     const id = ++nextId;
@@ -71,6 +72,11 @@ const server = http.createServer((req, res) => {
     return result.result.value;
   };
   const click = id => evaluate(`document.getElementById('${id}').click()`);
+  const chooseFile = async (selector, file) => {
+    const doc = await call("DOM.getDocument");
+    const input = await call("DOM.querySelector", {nodeId:doc.root.nodeId,selector});
+    await call("DOM.setFileInputFiles", {nodeId:input.nodeId,files:[file]});
+  };
   const exported = () => evaluate("editModeTest.exportText()");
   const drag = async (x, y) => {
     const point = await evaluate(`(() => { const s=editModeTest.state, r=document.getElementById('canvasShell').getBoundingClientRect(); return {x:r.left+s.panX+${x}*s.zoom,y:r.top+s.panY+${y}*s.zoom}; })()`);
@@ -104,6 +110,7 @@ const server = http.createServer((req, res) => {
     editModeTest.loadJsonOnMainThread(JSON.stringify(data));
   })()`);
   await until(() => evaluate("document.getElementById('mainImage').naturalWidth === 2000"));
+  assert.equal(await evaluate("(() => {const s=editModeTest.state,c=document.getElementById('canvasShell');return s.zoom===Math.min(1,(c.clientWidth-24)/2000,(c.clientHeight-24)/1500) && !s.labelZoom;})()"), true, "newly loaded images fit the entire canvas by default");
   assert.equal(await evaluate("document.getElementById('brightnessRange').step"), "1", "image adjustment sliders accept one-percent changes");
   await fineDrag("brightnessRange");
   assert.equal(await evaluate("editModeTest.state.imageBrightness"), 102, "short drags change brightness by two percent");
@@ -314,7 +321,30 @@ const server = http.createServer((req, res) => {
     if (readable) {
       assert.equal(await evaluate("!!window.cropTestUrl"), true, "cross-origin current layers export automatically when their server permits CORS");
     } else {
-      assert.equal(await evaluate("window.cropTestUrl===null && document.getElementById('cropExportMenu').textContent.includes('浏览器禁止导出其像素')"), true, "unreadable current layers explain browser restrictions without asking to select another image");
+      assert.equal(await evaluate("window.cropTestUrl===null && !document.getElementById('cropOriginalFallback').hidden && document.getElementById('cropExportMenu').textContent.includes('浏览器禁止导出其像素')"), true, "unreadable current layers offer original-file confirmation");
+      const originalImage = path.join(artifacts, "image.png"), wrongImage = path.join(artifacts, "wrong.png");
+      const wrongDimensions = path.join(artifacts, "wrong-dimensions", "image.png");
+      fs.writeFileSync(originalImage, imageFixture);
+      fs.writeFileSync(wrongImage, imageFixture);
+      fs.mkdirSync(path.dirname(wrongDimensions), {recursive:true});
+      fs.writeFileSync(wrongDimensions, Buffer.from(await evaluate("(()=>{const c=document.createElement('canvas');c.width=c.height=20;return c.toDataURL().split(',')[1];})()"), "base64"));
+      await call("Page.setInterceptFileChooserDialog", {enabled:true});
+      await click("cropChooseOriginalBtn");
+      await chooseFile("#cropOriginalFile", wrongImage);
+      await until(() => evaluate("document.getElementById('cropExportMenu').textContent.includes('所选文件不是当前原图')"));
+      assert.equal(await evaluate("window.cropTestUrl"), null, "a different original filename cannot be silently exported");
+      await click("cropChooseOriginalBtn");
+      await chooseFile("#cropOriginalFile", wrongDimensions);
+      await until(() => evaluate("document.getElementById('cropExportMenu').textContent.includes('原图尺寸与当前图层不一致')"));
+      assert.equal(await evaluate("window.cropTestUrl"), null, "a same-name image with different dimensions cannot be silently exported");
+      await click("cropChooseOriginalBtn");
+      await chooseFile("#cropOriginalFile", originalImage);
+      await until(() => evaluate("!!window.cropTestUrl && !document.getElementById('cropExportBtn').disabled"));
+      assert.deepEqual(await evaluate("(async()=>{const b=await createImageBitmap(await(await fetch(cropTestUrl)).blob());const size=[b.width,b.height];b.close();return size;})()"), [280,224], "confirming the original exports the correct crop despite the layer's browser restriction");
+      await evaluate("window.cropTestUrl=null;document.getElementById('canvasShell').dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));document.getElementById('cropExportBtn').click()");
+      await until(() => evaluate("!!window.cropTestUrl && !document.getElementById('cropExportBtn').disabled"));
+      assert.equal(await evaluate("document.getElementById('cropOriginalFallback').hidden"), true, "a confirmed original is reused in the current page without another file choice");
+      await call("Page.setInterceptFileChooserDialog", {enabled:false});
     }
     await evaluate("HTMLAnchorElement.prototype.click=originalCropClick;document.getElementById('cropExportMenu').hidden=true;editModeTest.selectObject(-1)");
   }
@@ -385,18 +415,44 @@ const server = http.createServer((req, res) => {
   }
   await call("Emulation.setDeviceMetricsOverride", {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   await pause(150);
-  await evaluate("document.getElementById('labelFilter').value='edited';document.getElementById('applyFiltersBtn').click();editModeTest.selectObject(0);Object.assign(editModeTest.state,{showBoxes:false,zoom:1.7,panX:-120,panY:35});document.dispatchEvent(new Event('change'))");
+  await evaluate("document.getElementById('labelFilter').value='edited';document.getElementById('applyFiltersBtn').click();editModeTest.selectObject(0);document.getElementById('labelZoomBtn').click();Object.assign(editModeTest.state,{showBoxes:false,zoom:1.7,panX:-120,panY:35});document.dispatchEvent(new Event('change'))");
   await until(() => evaluate("document.getElementById('attrsDraftStatus').textContent.includes('已自动保存')"));
   await call("Page.reload");
-  await until(() => evaluate("!!window.editModeTest && !!editModeTest.state.data && document.getElementById('mainImage').naturalWidth===2000 && editModeTest.state.zoom===1.7"));
+  await until(() => evaluate("!!window.editModeTest && !!editModeTest.state.data && document.getElementById('mainImage').naturalWidth===2000"));
   assert.equal(await exported(), edited, "reload restores the current tab's annotation data");
   assert.equal(await evaluate("editModeTest.state.showBoxes"), false, "reload retains display settings");
-  assert.deepEqual(await evaluate("({zoom:editModeTest.state.zoom,panX:editModeTest.state.panX,panY:editModeTest.state.panY,filter:editModeTest.state.appliedFilters.label,selection:editModeTest.state.selectedObjectIndex})"), {zoom:1.7,panX:-120,panY:35,filter:"edited",selection:0}, "reload restores the image, viewport, filter and selection");
+  assert.deepEqual(await evaluate("({filter:editModeTest.state.appliedFilters.label,selection:editModeTest.state.selectedObjectIndex})"), {filter:"edited",selection:0}, "reload restores the filter and selection");
+  assert.equal(await evaluate("(() => {const s=editModeTest.state,c=document.getElementById('canvasShell'),zoom=Math.min(1,(c.clientWidth-24)/2000,(c.clientHeight-24)/1500);return !s.labelZoom && s.zoom===zoom && s.panX===Math.round((c.clientWidth-2000*zoom)/2) && s.panY===Math.round((c.clientHeight-1500*zoom)/2);})()"), true, "reload fits the entire image to the canvas instead of restoring the previous box focus or zoom");
   const currentUrl = await evaluate("location.href");
   await call("Page.navigate", {url:currentUrl});
   await until(() => evaluate("!!window.editModeTest"));
   await pause(300);
   assert.equal(await evaluate("editModeTest.state.data"), null, "fresh navigation does not open previous work");
+  // The ordinary file:// entry supplies the real local path and confirms its original without a service.
+  const localImage = path.join(artifacts, "本地 原图#100%.png"), localJson = path.join(artifacts, "local-annotations.json");
+  fs.writeFileSync(localImage, imageFixture);
+  fs.writeFileSync(localJson, JSON.stringify({[localImage]:{width:2000,height:1500,det:{objects:[{labels:["local"],bbox:[100,100,300,100,300,260,100,260],attrs:{}}]}}}));
+  await call("Page.navigate", {url:require("node:url").pathToFileURL(path.join(root,"index.html")).href});
+  await until(() => evaluate("!!window.AttributeUI && !!window.attachCropExport"));
+  await chooseFile("#jsonFileInput", localJson);
+  await until(() => evaluate("document.getElementById('mainImage').complete && document.getElementById('mainImage').naturalWidth===2000"));
+  await evaluate("document.querySelector('#objectList button[data-object-index=\"0\"]').click();HTMLAnchorElement.prototype.click=function(){window.localCropUrl=this.href};document.getElementById('canvasShell').dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));document.getElementById('cropExportBtn').click()");
+  await until(() => evaluate("!document.getElementById('cropExportBtn').disabled"));
+  assert.equal(await evaluate("document.getElementById('cropOriginalPath').value"), localImage, "the original path is taken from the current layer and decoded for the native file dialog");
+  if (await evaluate("!document.getElementById('cropOriginalFallback').hidden")) {
+    await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts,"local-crop-confirm.png"),Buffer.from(result.data,"base64")));
+    await call("Emulation.setFocusEmulationEnabled", {enabled:true});
+    await call("Browser.grantPermissions", {permissions:["clipboardReadWrite","clipboardSanitizedWrite"]});
+    await call("Page.setInterceptFileChooserDialog", {enabled:true});
+    const count = fileChoosers.length;
+    await call("Runtime.evaluate", {expression:"document.getElementById('cropChooseOriginalBtn').click()",userGesture:true,awaitPromise:true});
+    await until(() => fileChoosers.length > count);
+    assert.equal(await evaluate("navigator.clipboard.readText()"), localImage, "choosing the original copies the exact local path for paste and confirmation");
+    await chooseFile("#cropOriginalFile", localImage);
+    await until(() => evaluate("!!window.localCropUrl && !document.getElementById('cropExportBtn').disabled"));
+    assert.deepEqual(await evaluate("(async()=>{const b=await createImageBitmap(await(await fetch(localCropUrl)).blob());const result=[b.width,b.height];b.close();return result;})()"), [280,224], "confirming a local original exports its pixels without any local service");
+    await call("Page.setInterceptFileChooserDialog", {enabled:false});
+  }
   assert.deepEqual(exceptions, []);
   console.log("PASS: default lock, box/handle/edge/keypoint gestures, enabled editing, undo, controls, shortcuts, pending placement, desktop/mobile screenshots");
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => {
