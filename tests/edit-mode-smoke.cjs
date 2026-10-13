@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
     if (error) { res.writeHead(404); res.end(); return; }
     res.setHeader("Content-Type", ({ ".html": "text/html", ".js": "text/javascript", ".css": "text/css" })[path.extname(file)] || "application/octet-stream");
     // Expose state only in the test server, so assertions inspect exported data too.
-    if (file === path.join(root, "app.js")) bytes = bytes.toString().replace(/\}\)\(\);\s*$/, "window.editModeTest = { state, exportText, loadJsonOnMainThread, selectObject, isObjectVisibleInOverlay };})();");
+    if (file === path.join(root, "app.js")) bytes = bytes.toString().replace(/\}\)\(\);\s*$/, "window.editModeTest = { state, exportText, loadJsonOnMainThread, selectObject, isObjectVisibleInOverlay, pickObjectAtPoint };})();");
     res.end(bytes);
   });
 });
@@ -214,6 +214,32 @@ const server = http.createServer((req, res) => {
     s.showBoxes=originalVisibility;
     return true;
   })()`), true, "repeated Objects clicks cancel highlighting without changing global visibility or view");
+  assert.equal(await evaluate(`(() => {
+    const s=editModeTest.state, objects=s.data[s.currentImage].det.objects;
+    const original=objects.slice(), index=s.selectedObjectIndex, filter=s.appliedFilters;
+    const small={labels:['small'],bbox:[280,160,315,160,315,200,280,200],attrs:{box_type:'rectangle'}};
+    const large={labels:['large'],bbox:[100,100,300,100,300,260,100,260],attrs:{box_type:'rectangle'}};
+    s.appliedFilters={...filter,label:'',labelExact:[]};
+    objects.splice(0,objects.length,small,large);
+    editModeTest.selectObject(1);
+    const overlap=editModeTest.pickObjectAtPoint(295,180)===0;
+    const protruding=editModeTest.pickObjectAtPoint(310,180)===0;
+    const tolerance=editModeTest.pickObjectAtPoint(315+2/s.zoom,180)===0;
+    const exposedLarge=editModeTest.pickObjectAtPoint(200,180)===1;
+    const savedEdit=s.editMode;
+    s.editMode=true;
+    const rect=document.getElementById('canvasShell').getBoundingClientRect();
+    document.getElementById('canvasShell').dispatchEvent(new PointerEvent('pointerdown',{button:0,clientX:rect.left+s.panX+295*s.zoom,clientY:rect.top+s.panY+180*s.zoom,bubbles:true}));
+    const selectedSmall=s.selectedObjectIndex===0 && !s.drag;
+    s.editMode=savedEdit;
+    editModeTest.selectObject(-1);
+    s.appliedFilters={...filter,label:'large',labelExact:[]};
+    const ignoresHidden=editModeTest.pickObjectAtPoint(295,180)===1;
+    objects.splice(0,objects.length,...original);
+    s.appliedFilters=filter;
+    editModeTest.selectObject(index);
+    return overlap && protruding && tolerance && exposedLarge && selectedSmall && ignoresHidden;
+  })()`), true, "overlapping small boxes win independently of order and selected large edge editing");
   assert.equal(await evaluate(`(async () => {
     editModeTest.selectObject(0);
     const canvas=document.getElementById('canvasShell');

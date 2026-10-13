@@ -1657,12 +1657,25 @@
 
   function pickObjectAtPoint(imageX, imageY) {
     const objects = currentObjects();
+    const containers = state.showContainedBoxes ? getFilteredContainerBboxes(objects) : [];
+    const tolerance = 4 / getOverlayScale();
+    let bestIndex = -1, bestArea = Infinity;
     for (let i = objects.length - 1; i >= 0; i -= 1) {
-      if (pointInPolygon(imageX, imageY, bboxToPoints(objects[i].bbox))) {
-        return i;
-      }
+      if (i !== state.selectedObjectIndex && !isObjectVisibleInOverlay(objects[i], i, objects, containers)) continue;
+      const points = bboxToPoints(objects[i].bbox);
+      const inside = pointInPolygon(imageX, imageY, points);
+      const nearEdge = points.some((point, index) => {
+        const next = points[(index + 1) % points.length];
+        return distanceToSegment(imageX, imageY, point[0], point[1], next[0], next[1]) <= tolerance;
+      });
+      if (!inside && !nearEdge) continue;
+      const area = Math.abs(points.reduce((sum, point, index) => {
+        const next = points[(index + 1) % points.length];
+        return sum + point[0] * next[1] - next[0] * point[1];
+      }, 0)) / 2;
+      if (area < bestArea) { bestArea = area; bestIndex = i; }
     }
-    return -1;
+    return bestIndex;
   }
 
   function pointInPolygon(x, y, points) {
@@ -2393,6 +2406,13 @@
       return;
     }
     const handleIndex = state.editMode && state.showBoxes ? findHandleHit(coords.x, coords.y) : -1;
+    const preferredObjectIndex = state.editMode ? pickObjectAtPoint(coords.x, coords.y) : -1;
+    if (preferredObjectIndex >= 0 && preferredObjectIndex !== state.selectedObjectIndex
+      && handleIndex < 0) {
+      event.preventDefault();
+      selectObject(preferredObjectIndex);
+      return;
+    }
     if (handleIndex >= 0) {
       event.preventDefault();
       recordUndoSnapshot();
