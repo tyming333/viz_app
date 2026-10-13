@@ -1,6 +1,7 @@
 (function () {
   "use strict";
   window.attachCropExport = function (viewer) {
+    const directories = window.LocalImageDirectory.createManager();
     const storageKey = "viz-app.crop-padding";
     let padding = { top: 0.2, bottom: 0.2, left: 0.2, right: 0.2 };
     try {
@@ -66,7 +67,33 @@
     fileInput.hidden = true;
     const help = document.createElement("p");
     fallback.append(pathLabel, copyButton, fileButton, fileInput, help);
-    menu.append(button, fallback, output);
+    const directoryControls = document.createElement("div");
+    const directoryButton = document.createElement("button"), permissionButton = document.createElement("button");
+    directoryButton.id = "cropChooseDirectoryBtn";
+    directoryButton.type = permissionButton.type = "button";
+    directoryButton.textContent = "授权图片文件夹";
+    directoryButton.disabled = !window.showDirectoryPicker;
+    if (directoryButton.disabled) directoryButton.title = "目录授权需要 Chrome 或 Edge；也可使用单张原图确认";
+    permissionButton.id = "cropDirectoryPermissionBtn";
+    permissionButton.textContent = "重新授权已保存目录";
+    permissionButton.hidden = true;
+    const directoryStatus = document.createElement("p"), mapping = document.createElement("details");
+    directoryStatus.id = "cropDirectoryStatus";
+    const summary = document.createElement("summary"), mappingLabel = document.createElement("label");
+    summary.textContent = "目录映射";
+    mappingLabel.textContent = "所选文件夹对应的原路径";
+    const mappingInput = document.createElement("input"), mappingButton = document.createElement("button");
+    mappingInput.id = "cropDirectoryRoot";
+    mappingInput.type = "text";
+    mappingInput.style.width = "100%";
+    mappingButton.id = "cropApplyDirectoryBtn";
+    mappingButton.type = "button";
+    mappingButton.textContent = "应用目录映射";
+    mappingLabel.append(mappingInput);
+    mapping.append(summary, mappingLabel, mappingButton);
+    mapping.hidden = true;
+    directoryControls.append(directoryButton, permissionButton, directoryStatus, mapping);
+    menu.append(button, directoryControls, fallback, output);
     document.body.append(menu);
     function positionMenu(x, y) {
       menu.style.left = Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8)) + "px";
@@ -74,6 +101,83 @@
     }
     const confirmedFiles = new Map();
     let choosingTarget = null;
+    let pendingDirectory = null;
+    function isCurrent(selected) {
+      const image = document.getElementById("mainImage");
+      return target === selected && selected.image === viewer.imageName() && selected.source === (image.currentSrc || image.src);
+    }
+    async function updateDirectoryControls(selected) {
+      await directories.ready;
+      if (target !== selected) return;
+      const current = directories.matching(selected);
+      directoryButton.textContent = current ? "更换图片文件夹" : "授权图片文件夹";
+      directoryStatus.textContent = current ? "图片目录：" + current.handle.name + (directories.persistenceError() ? "（仅本次可用，未能保存授权）" : "") : "选择一次目录，即可读取其中及子目录的原图。";
+      if (current && !pendingDirectory) {
+        mappingInput.value = current.root;
+        mapping.hidden = false;
+      }
+    }
+    async function validateOriginal(file, selected) {
+      const image = await createImageBitmap(file);
+      try {
+        if (image.width !== selected.width || image.height !== selected.height) throw new Error("原图尺寸与当前图层不一致，请检查所选目录和映射");
+      } finally { image.close(); }
+    }
+    async function registerDirectory(handle, selected, root) {
+      try {
+        await directories.register(handle, selected, root, file => validateOriginal(file, selected));
+        pendingDirectory = null;
+        permissionButton.hidden = true;
+        mapping.open = false;
+        await updateDirectoryControls(selected);
+        return true;
+      } catch (error) {
+        output.textContent = "目录授权未完成：" + error.message;
+        mapping.hidden = false;
+        mapping.open = true;
+        return false;
+      }
+    }
+    directoryButton.addEventListener("click", async () => {
+      if (!target || button.disabled || !window.showDirectoryPicker) return;
+      const selected = target;
+      directoryButton.disabled = button.disabled = true;
+      let accepted = false;
+      try {
+        const handle = await window.showDirectoryPicker({ id: "viz-crop-images", mode: "read" });
+        if (!isCurrent(selected)) return;
+        pendingDirectory = handle;
+        mappingInput.value = window.LocalImageDirectory.candidateRoots(selected, handle.name)[0] || "";
+        directoryStatus.textContent = "所选图片目录：" + handle.name;
+        accepted = await registerDirectory(handle, selected);
+      } catch (error) {
+        output.textContent = error.name === "AbortError" ? "已取消选择，原有目录授权保留。" : "无法选择图片目录：" + error.message;
+      } finally {
+        directoryButton.disabled = button.disabled = false;
+        positionMenu(parseFloat(menu.style.left), parseFloat(menu.style.top));
+      }
+      if (accepted && isCurrent(selected)) button.click();
+    });
+    mappingButton.addEventListener("click", async () => {
+      if (!target || button.disabled) return;
+      const selected = target, handle = pendingDirectory || directories.matching(selected)?.handle;
+      if (!handle) return;
+      mappingButton.disabled = button.disabled = true;
+      const accepted = await registerDirectory(handle, selected, mappingInput.value);
+      mappingButton.disabled = button.disabled = false;
+      positionMenu(parseFloat(menu.style.left), parseFloat(menu.style.top));
+      if (accepted && isCurrent(selected)) button.click();
+    });
+    permissionButton.addEventListener("click", async () => {
+      if (!target || button.disabled) return;
+      const selected = target;
+      try {
+        if (await directories.requestAccess(selected)) {
+          permissionButton.hidden = true;
+          if (isCurrent(selected)) button.click();
+        } else output.textContent = "尚未允许读取目录，可重新授权或选择单张原图。";
+      } catch (error) { output.textContent = "目录授权失败：" + error.message; }
+    });
     function updatePath(selected) {
       const localPath = window.ViewerCore.getLocalImagePath(selected.source);
       pathInput.value = localPath || selected.image;
@@ -164,6 +268,12 @@
       target = { bbox: obj.bbox.slice(), image: viewer.imageName(), source: loaded.currentSrc, width: loaded.naturalWidth, height: loaded.naturalHeight, index: viewer.index() };
       output.textContent = "";
       fallback.hidden = true;
+      pendingDirectory = null;
+      mapping.hidden = true;
+      mapping.open = false;
+      permissionButton.hidden = true;
+      directoryStatus.textContent = "正在检查目录授权…";
+      updateDirectoryControls(target).then(() => positionMenu(parseFloat(menu.style.left), parseFloat(menu.style.top)));
       updatePath(target);
       menu.hidden = false;
       positionMenu(event.clientX, event.clientY);
@@ -195,8 +305,11 @@
         if (selected.image !== viewer.imageName() || selected.source !== loaded.currentSrc || !loaded.complete || !loaded.naturalWidth) {
           throw new Error("当前图层已切换或尚未加载完成，请等待当前图片加载后重新右键导出");
         }
-        const confirmed = confirmedFiles.get(selected.source);
+        const confirmed = confirmedFiles.get(selected.source) || await directories.read(selected);
         bitmap = await createImageBitmap(confirmed || loaded);
+        if (confirmed && (bitmap.width !== selected.width || bitmap.height !== selected.height)) {
+          throw Object.assign(new Error("原图尺寸与当前图层不一致，请检查目录映射或重新确认原图"), { code: "directory-file" });
+        }
         const xs = selected.bbox.filter((_, i) => i % 2 === 0), ys = selected.bbox.filter((_, i) => i % 2 === 1);
         const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
         const width = maxX - minX, height = maxY - minY;
@@ -234,9 +347,10 @@
         fallback.hidden = true;
         output.textContent = "已导出 " + canvas.width + " × " + canvas.height;
       } catch (error) {
-        fallback.hidden = error.name !== "SecurityError";
+        fallback.hidden = error.name !== "SecurityError" && !String(error.code || "").startsWith("directory-");
+        permissionButton.hidden = error.code !== "directory-permission";
         output.textContent = error.name === "SecurityError"
-          ? "浏览器禁止导出其像素，请确认一次当前原图；确认后本页面可复用。"
+          ? "浏览器禁止导出其像素，请授权图片文件夹；也可在下方确认单张原图。"
           : "裁剪失败：" + error.message;
       }
       finally { bitmap?.close(); button.disabled = false; positionMenu(parseFloat(menu.style.left), parseFloat(menu.style.top)); }

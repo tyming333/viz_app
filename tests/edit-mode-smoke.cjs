@@ -23,7 +23,7 @@ const imageServer = http.createServer((req, res) => {
   res.end(imageFixture);
 });
 const server = http.createServer((req, res) => {
-  if (new URL(req.url, "http://localhost").pathname === "/test-image.png" && imageFixture) {
+  if ((new URL(req.url, "http://localhost").pathname === "/test-image.png" || req.url.startsWith("/directory-fixtures/")) && imageFixture) {
     res.setHeader("Content-Type", "image/png");
     res.end(imageFixture);
     return;
@@ -428,6 +428,53 @@ const server = http.createServer((req, res) => {
   await until(() => evaluate("!!window.editModeTest"));
   await pause(300);
   assert.equal(await evaluate("editModeTest.state.data"), null, "fresh navigation does not open previous work");
+  // Only the native picker is substituted. Directory reads and IndexedDB handle persistence are real.
+  await evaluate(`(async () => {
+    const root=await navigator.storage.getDirectory();
+    const dir=await root.getDirectoryHandle('directory-fixtures',{create:true});
+    const data={};
+    for(const [name,color] of [['a','#ff0000'],['b','#0000ff']]) {
+      const sub=await dir.getDirectoryHandle(name,{create:true});
+      const file=await sub.getFileHandle('same.png',{create:true});
+      const canvas=document.createElement('canvas');canvas.width=2000;canvas.height=1500;
+      const ctx=canvas.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,2000,1500);
+      const writable=await file.createWritable();await writable.write(await new Promise(r=>canvas.toBlob(r)));await writable.close();
+      data[location.origin+'/directory-fixtures/'+name+'/same.png']={width:2000,height:1500,det:{objects:[{labels:['directory'],bbox:[100,100,300,100,300,260,100,260],attrs:{}}]}};
+    }
+    window.directoryPickerCalls=0;
+    window.showDirectoryPicker=async options=>{if(options.mode!=='read')throw Error('Expected read-only picker');window.directoryPickerCalls++;return dir;};
+    window.directoryFixture=JSON.stringify(data);
+    editModeTest.loadJsonOnMainThread(directoryFixture);
+    HTMLAnchorElement.prototype.click=function(){window.directoryCropUrl=this.href;};
+  })()`);
+  const openDirectoryCrop = async () => {
+    await until(() => evaluate("document.getElementById('mainImage').complete && document.getElementById('mainImage').naturalWidth===2000"));
+    await evaluate("editModeTest.selectObject(0);window.directoryCropUrl=null;document.getElementById('canvasShell').dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}))");
+  };
+  const cropPixel = async () => {
+    await until(() => evaluate("!!window.directoryCropUrl && !document.getElementById('cropExportBtn').disabled"));
+    return evaluate("(async()=>{const b=await createImageBitmap(await(await fetch(directoryCropUrl)).blob());const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d');ctx.drawImage(b,0,0);b.close();return Array.from(ctx.getImageData(0,0,1,1).data);})()");
+  };
+  await openDirectoryCrop();
+  await click("cropChooseDirectoryBtn");
+  assert.deepEqual(await cropPixel(), [255,0,0,255], "authorizing a folder immediately exports the matching original");
+  await click("nextImageBtn");
+  await openDirectoryCrop();
+  await click("cropExportBtn");
+  assert.deepEqual(await cropPixel(), [0,0,255,255], "same-named files in different subdirectories are never mixed");
+  assert.equal(await evaluate("directoryPickerCalls"), 1, "switching images reuses one folder authorization");
+  await until(() => evaluate("document.getElementById('attrsDraftStatus').textContent.includes('已自动保存')"));
+  await call("Page.reload");
+  await until(() => evaluate("!!window.editModeTest && !!editModeTest.state.data && document.getElementById('mainImage').naturalWidth===2000"));
+  await evaluate("HTMLAnchorElement.prototype.click=function(){window.directoryCropUrl=this.href;};window.showDirectoryPicker=async()=>{throw Error('Unexpected picker after reload');}");
+  await openDirectoryCrop();
+  await click("cropExportBtn");
+  assert.deepEqual(await cropPixel(), [0,0,255,255], "refresh restores real serialized directory handles and reads without another picker");
+  await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts,"directory-crop.png"),Buffer.from(result.data,"base64")));
+  await call("Page.navigate", {url:currentUrl});
+  await until(() => evaluate("!!window.editModeTest"));
+  await pause(300);
+  assert.equal(await evaluate("editModeTest.state.data"), null, "remembered directory authorization does not open old annotations in a fresh page");
   // The ordinary file:// entry supplies the real local path and confirms its original without a service.
   const localImage = path.join(artifacts, "本地 原图#100%.png"), localJson = path.join(artifacts, "local-annotations.json");
   fs.writeFileSync(localImage, imageFixture);
