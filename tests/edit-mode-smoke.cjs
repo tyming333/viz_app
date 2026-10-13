@@ -184,6 +184,19 @@ const server = http.createServer((req, res) => {
     return enabled && resized && !editModeTest.state.labelZoom;
   })()`), true, "label zoom focuses all boxes and accepts an adjustable minimum size");
   assert.equal(await evaluate(`(() => {
+    const s=editModeTest.state, canvas=document.getElementById('canvasShell');
+    const original={zoom:s.zoom,panX:s.panX,panY:s.panY,index:s.selectedObjectIndex};
+    document.querySelector('#objectList button[data-object-index="0"]').click();
+    const unchanged=s.zoom===original.zoom && s.panX===original.panX && s.panY===original.panY;
+    s.zoom=3;
+    document.querySelector('#objectList button[data-object-index="0"]').click();
+    const centered=s.zoom===3 && Math.abs(s.panX+200*s.zoom-canvas.clientWidth/2)<0.01
+      && Math.abs(s.panY+180*s.zoom-canvas.clientHeight/2)<0.01;
+    document.getElementById('resetViewBtn').click();
+    editModeTest.selectObject(original.index);
+    return unchanged && centered;
+  })()`), true, "Objects clicks center oversized images without changing zoom or fitted views");
+  assert.equal(await evaluate(`(() => {
     const input = document.getElementById('labelFilter');
     input.value = 'sam';
     input.dispatchEvent(new Event('input', {bubbles: true}));
