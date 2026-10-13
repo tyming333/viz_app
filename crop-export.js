@@ -44,6 +44,21 @@
     button.textContent = "裁剪导出 PNG";
     button.type = "button";
     menu.append(button, output);
+    const fileInput = document.createElement("input"), fileButton = document.createElement("button");
+    fileInput.type = "file";
+    fileInput.accept = "image/*";
+    fileInput.hidden = true;
+    fileButton.type = "button";
+    fileButton.textContent = "选择原图后裁剪";
+    fileButton.hidden = true;
+    menu.append(fileButton, fileInput);
+    fileButton.addEventListener("click", () => fileInput.click());
+    let originalFile = null;
+    fileInput.addEventListener("change", () => {
+      originalFile = fileInput.files[0] || null;
+      if (originalFile) button.click();
+      fileInput.value = "";
+    });
     document.body.append(menu);
     function savePadding() {
       const next = {};
@@ -66,6 +81,8 @@
       if (!obj || viewer.batchPreview()) return;
       event.preventDefault();
       target = { bbox: obj.bbox.slice(), image: viewer.imageName(), index: viewer.index() };
+      originalFile = null;
+      fileButton.hidden = true;
       output.textContent = "";
       menu.hidden = false;
       menu.style.left = Math.max(8, Math.min(event.clientX, innerWidth - menu.offsetWidth - 8)) + "px";
@@ -81,8 +98,16 @@
       button.disabled = true;
       let bitmap;
       try {
-        const blob = await viewer.readImage(selected.image);
-        bitmap = await createImageBitmap(blob);
+        if (originalFile) bitmap = await createImageBitmap(originalFile);
+        else {
+          const loaded = document.getElementById("mainImage");
+          if (selected.image === viewer.imageName() && loaded.complete && loaded.naturalWidth > 0) {
+            try { bitmap = await createImageBitmap(loaded); }
+            catch (_) { bitmap = await createImageBitmap(await viewer.readImage(selected.image)); }
+          } else {
+            bitmap = await createImageBitmap(await viewer.readImage(selected.image));
+          }
+        }
         const xs = selected.bbox.filter((_, i) => i % 2 === 0), ys = selected.bbox.filter((_, i) => i % 2 === 1);
         const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
         const width = maxX - minX, height = maxY - minY;
@@ -106,7 +131,10 @@
         link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 10000);
         output.textContent = "已导出 " + canvas.width + " × " + canvas.height;
-      } catch (error) { output.textContent = "裁剪失败：" + error.message; }
+      } catch (error) {
+        fileButton.hidden = false;
+        output.textContent = "浏览器无法读取原图像素，请点击“选择原图后裁剪”选择当前图片。";
+      }
       finally { bitmap?.close(); button.disabled = false; }
     });
   };

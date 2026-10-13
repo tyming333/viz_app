@@ -202,7 +202,7 @@ const server = http.createServer((req, res) => {
     canvas.dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));
     const menu=document.getElementById('cropExportMenu');
     const input=menu.querySelector('[data-crop-side=left]');
-    const defaults=Array.from(menu.querySelectorAll('input')).every(i=>Number(i.value)===0.2);
+    const defaults=Array.from(menu.querySelectorAll('[data-crop-side]')).every(i=>Number(i.value)===0.2);
     input.value='0.5';input.dispatchEvent(new Event('change'));
     const original=HTMLAnchorElement.prototype.click;
     let dimensions;
@@ -214,7 +214,8 @@ const server = http.createServer((req, res) => {
     const remembered=JSON.parse(localStorage.getItem('viz-app.crop-padding')).left===0.5;
     input.value='0.2';input.dispatchEvent(new Event('change'));
     menu.hidden=true;editModeTest.selectObject(-1);
-    return defaults && remembered && dimensions?.[0]===340 && dimensions?.[1]===224;
+    if (!(defaults && remembered && dimensions?.[0]===340 && dimensions?.[1]===224)) throw Error(JSON.stringify({defaults,remembered,dimensions,message:menu.textContent}));
+    return true;
   })()`), true, "right-click crop exports padded original pixels and remembers ratios");
   assert.equal(await evaluate(`(() => {
     const input = document.getElementById('labelFilter');
