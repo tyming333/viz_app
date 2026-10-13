@@ -232,18 +232,13 @@
     if (!bounds) return null;
 
     const target = normalizeLabelZoomSize(minimumSize, 1024);
-    const imageHasSize = Number.isFinite(imageWidth) && imageWidth > 0
-      && Number.isFinite(imageHeight) && imageHeight > 0;
-    const width = Math.min(imageHasSize ? imageWidth : Infinity, Math.max(target, bounds.right - bounds.left));
-    const height = Math.min(imageHasSize ? imageHeight : Infinity, Math.max(target, bounds.bottom - bounds.top));
+    const width = Math.max(target, bounds.right - bounds.left);
+    const height = Math.max(target, bounds.bottom - bounds.top);
     const centerX = (bounds.left + bounds.right) / 2;
     const centerY = (bounds.top + bounds.bottom) / 2;
-    let left = centerX - width / 2;
-    let top = centerY - height / 2;
-    if (imageHasSize) {
-      left = Math.max(0, Math.min(imageWidth - width, left));
-      top = Math.max(0, Math.min(imageHeight - height, top));
-    }
+    // Allow padding outside the image so edge labels retain their bounding-box center.
+    const left = centerX - width / 2;
+    const top = centerY - height / 2;
     return { left, top, right: left + width, bottom: top + height };
   }
 

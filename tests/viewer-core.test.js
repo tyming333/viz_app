@@ -52,13 +52,13 @@ test("calculates a centered minimum-size label focus region", () => {
   assert.equal(normalizeLabelZoomSize("99999", 1024), 8192);
 });
 
-test("label focus region returns null without valid boxes and clamps to small images", () => {
+test("label focus region preserves the label center near image edges and on small images", () => {
   assert.equal(getLabelZoomBounds([], 1024, 1000, 800), null);
   assert.deepEqual(getLabelZoomBounds([{ bbox: [20, 20, 40, 20, 40, 40, 20, 40] }], 1024, 400, 300), {
-    left: 0,
-    top: 0,
-    right: 400,
-    bottom: 300
+    left: -482,
+    top: -482,
+    right: 542,
+    bottom: 542
   });
 });
 
