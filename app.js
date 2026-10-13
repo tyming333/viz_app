@@ -3133,6 +3133,14 @@
     selectFirst: () => selectObject(currentObjects().findIndex(obj => matchesAppliedOverlayFilter(obj))),
     resize: () => { syncCanvasSize(); resetView(); renderAnnotationOverlays(); }
   });
+  window.addEventListener("DOMContentLoaded", () => window.attachCropExport({
+    canvas: els.canvasShell,
+    object: currentObject,
+    imageName: () => state.currentImage,
+    index: () => state.selectedObjectIndex,
+    batchPreview: () => state.batchPreview,
+    readImage: name => readImageBlob(name, null)
+  }));
   renderFull();
   applyImageAdjustments();
 })();

@@ -196,6 +196,26 @@ const server = http.createServer((req, res) => {
     editModeTest.selectObject(original.index);
     return unchanged && centered;
   })()`), true, "Objects clicks center oversized images without changing zoom or fitted views");
+  assert.equal(await evaluate(`(async () => {
+    editModeTest.selectObject(0);
+    const canvas=document.getElementById('canvasShell');
+    canvas.dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));
+    const menu=document.getElementById('cropExportMenu');
+    const input=menu.querySelector('[data-crop-side=left]');
+    const defaults=Array.from(menu.querySelectorAll('input')).every(i=>Number(i.value)===0.2);
+    input.value='0.5';input.dispatchEvent(new Event('change'));
+    const original=HTMLAnchorElement.prototype.click;
+    let dimensions;
+    HTMLAnchorElement.prototype.click=function(){window.cropTestUrl=this.href;};
+    document.getElementById('cropExportBtn').click();
+    for(let i=0;i<100 && !window.cropTestUrl;i++)await new Promise(r=>setTimeout(r,20));
+    if(window.cropTestUrl){const b=await createImageBitmap(await (await fetch(window.cropTestUrl)).blob());dimensions=[b.width,b.height];b.close();}
+    HTMLAnchorElement.prototype.click=original;
+    const remembered=JSON.parse(localStorage.getItem('viz-app.crop-padding')).left===0.5;
+    input.value='0.2';input.dispatchEvent(new Event('change'));
+    menu.hidden=true;editModeTest.selectObject(-1);
+    return defaults && remembered && dimensions?.[0]===340 && dimensions?.[1]===224;
+  })()`), true, "right-click crop exports padded original pixels and remembers ratios");
   assert.equal(await evaluate(`(() => {
     const input = document.getElementById('labelFilter');
     input.value = 'sam';
