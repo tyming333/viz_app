@@ -252,9 +252,8 @@
 
   function animateHoverEffect(timestamp) {
     state.hoverAnimationFrame = 0;
-    if (state.hoverTarget.kind === "none" || state.drag || state.pan || state.batchPreview) {
+    if ((state.hoverTarget.kind === "none" && !currentObject()) || state.drag || state.pan || state.batchPreview) {
       state.hoverPulse = 0;
-      renderOverlay();
       return;
     }
     state.hoverPulse = 0.5 + 0.5 * Math.sin(timestamp / 180);
@@ -1894,12 +1893,12 @@
     const objects = currentObjects();
     const containerBboxes = state.showContainedBoxes ? getFilteredContainerBboxes(objects) : [];
     objects.forEach(function eachObject(obj, index) {
-      if (!isObjectVisibleInOverlay(obj, index, objects, containerBboxes)) return;
+      if (index !== state.selectedObjectIndex && !isObjectVisibleInOverlay(obj, index, objects, containerBboxes)) return;
       const points = bboxToPoints(obj.bbox);
       const color = getObjectColor(obj, index);
       const active = index === state.selectedObjectIndex;
-      const hovered = active && state.hoverTarget.kind === "object";
-      if (state.showBoxes) {
+      const hovered = active && !state.drag && !state.pan;
+      if (state.showBoxes || active) {
         drawPolygon(points, color, "rgba(37,99,235,0.14)", active, hovered);
         if (active && state.hoverTarget.kind === "edge") drawHoverEdge(points, state.hoverTarget.index);
         drawLabel(points, obj.labels && obj.labels.length ? obj.labels[0] : "object " + (index + 1));
@@ -1918,6 +1917,9 @@
   }
 
   function renderOverlay() {
+    if (currentObject() && !state.hoverAnimationFrame && !state.drag && !state.pan && !state.batchPreview) {
+      state.hoverAnimationFrame = window.requestAnimationFrame(animateHoverEffect);
+    }
     if (state.overlayFrame) return;
     state.overlayFrame = window.requestAnimationFrame(function onframe() {
       state.overlayFrame = 0;
