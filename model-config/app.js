@@ -8,6 +8,7 @@
   let collapsed = new Set();
   let graphCollapsed = new Set(), graphQuery = "";
   let clipboard = null, placement = null, draggedPath = null, dropTarget = null;
+  let fileDragDepth = 0;
   let widthFrame = null;
   const measureContext = document.createElement("canvas").getContext("2d");
   const invalid = new Set();
@@ -59,6 +60,7 @@
   function newNode() { return { last_output: selected ? "0" : "root", [configuredLabelKey()]: "", current_model: "", code: "", num: "0", confidence: "0.5", non_defect: "false", childlist: [] }; }
   async function openFile(file) {
     if (!file) return;
+    if (doc && (doc.dirty || hasDraft()) && !window.confirm("当前修改尚未另存，打开其他文件将放弃这些修改。继续？")) return;
     try {
       const next = C.createDocument(new Uint8Array(await file.arrayBuffer()), file.name);
       doc = next; selected = null; tab = "form"; jsonPending = false; invalid.clear(); collapsed.clear();
@@ -73,9 +75,48 @@
     } catch (error) { status(`打开失败：${error.message}`, true); }
   }
   function chooseFile() {
-    if (doc && (doc.dirty || hasDraft()) && !window.confirm("当前修改尚未另存，打开其他文件将放弃这些修改。继续？")) return;
     $("fileInput").value = ""; $("fileInput").click();
   }
+  function hasFileDrag(event) {
+    return Array.from(event.dataTransfer?.types || []).includes("Files");
+  }
+  function setFileDropVisible(visible) {
+    $("fileDropOverlay").hidden = !visible;
+    $("fileDropOverlay").setAttribute("aria-hidden", String(!visible));
+  }
+  function resetFileDrag() {
+    fileDragDepth = 0;
+    setFileDropVisible(false);
+  }
+  document.addEventListener("dragenter", event => {
+    if (!hasFileDrag(event)) return;
+    event.preventDefault();
+    fileDragDepth += 1;
+    setFileDropVisible(true);
+  });
+  document.addEventListener("dragover", event => {
+    if (!hasFileDrag(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+  });
+  document.addEventListener("dragleave", event => {
+    if (!hasFileDrag(event)) return;
+    event.preventDefault();
+    fileDragDepth = Math.max(0, fileDragDepth - 1);
+    if (!fileDragDepth) setFileDropVisible(false);
+  });
+  document.addEventListener("drop", event => {
+    if (!hasFileDrag(event)) return;
+    event.preventDefault();
+    const file = event.dataTransfer.files?.[0];
+    resetFileDrag();
+    if (!file) return;
+    if (!/\.json$/i.test(file.name)) {
+      status("只支持拖入 JSON 配置文件。", true);
+      return;
+    }
+    openFile(file);
+  });
   function encodingLabel() { return `${doc.format.encoding.toUpperCase()} · ${doc.format.bom.length ? "有 BOM" : "无 BOM"}`; }
   function renderTree() {
     const all = C.routes(doc.data), query = $("searchInput").value.trim().toLowerCase();

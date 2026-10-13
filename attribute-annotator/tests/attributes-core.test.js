@@ -35,13 +35,15 @@ test("attribute names that match object prototype fields remain ordinary JSON ke
   assert.equal(JSON.stringify(chosen), '{"__proto__":"清晰"}');
   assert.deepEqual(core.choose(chosen, config.groups[0], null), {});
 });
-test("the supplied nut preset includes all ten attributes and their exact states", () => {
-  const table = core.exportConfig(core.defaultConfig());
-  assert.equal(Object.keys(table).length, 10);
-  assert.deepEqual(table["螺母数量"], ["明确可辨", "存疑", "不可辨"]);
-  assert.deepEqual(table["底座及垫片"], ["清晰", "基本可辨", "不可辨", "不适用"]);
-  assert.deepEqual(table["曝光"], ["正常", "轻微过曝", "严重过曝", "轻微欠曝", "严重欠曝"]);
-  assert.deepEqual(table["遮挡及截断"], ["无", "部分遮挡", "严重遮挡", "部分截断", "严重截断"]);
+test("the supplied JSON example has the twelve requested attributes and exact states", () => {
+  const table = JSON.parse(require("node:fs").readFileSync(require("node:path").join(__dirname, "../attrs-selection-table.example.json"), "utf8"));
+  assert.equal(Object.keys(table).length, 12);
+  assert.deepEqual(core.normalizeConfig(table), core.normalizeConfig(core.exportConfig(table)));
+  assert.deepEqual(table["螺母数量"], ["明确可辨", "基本可辨", "存疑", "不适用"]);
+  assert.deepEqual(table["螺母侧面棱线"], ["明确可辨", "基本可辨", "不可辨", "不适用"]);
+  assert.deepEqual(table["曝光"], ["正常", "轻微过曝", "严重过曝", "轻微欠曝", "严重欠曝", "不适用"]);
+  assert.deepEqual(table["遮挡"], ["无", "轻度遮挡", "部分遮挡", "严重遮挡", "不适用"]);
+  assert.deepEqual(table["综合质量"], ["质量优秀", "质量良好", "质量尚可", "质量一般", "质量较差", "质量极差"]);
 });
 
 test("attrs edits preserve existing metadata of any JSON type", () => {

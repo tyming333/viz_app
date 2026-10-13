@@ -23,6 +23,9 @@ h1, h2, h3 { font-size: var(--font-title); font-weight: 600; }
 #appSwitcher { min-height: 32px; font-size: var(--font-title); font-weight: 600; border-color: transparent; }
 .status { padding: 3px 14px; min-height: 26px; flex-shrink: 0; color: #586b86; background: #f0f5fc; border-bottom: 1px solid #e1e9f4; }
 .status.error { background: #fff0f1; color: #b4233a; }
+.file-drop-overlay { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(37, 99, 235, .12); pointer-events: none; }
+.file-drop-card { display: grid; gap: 4px; min-width: 280px; padding: 24px 30px; text-align: center; background: #fff; border: 2px dashed #2563eb; border-radius: 10px; box-shadow: 0 8px 30px rgba(38, 51, 72, .16); color: #2159c9; }
+.file-drop-card span { color: var(--muted); font-size: var(--font-meta); }
 .welcome { max-width: 820px; margin: 10vh auto 0; text-align: center; padding: 24px; }
 .welcome-icon { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 24px; border-radius: 18px; background: #e8effe; color: #2563eb; font: 600 26px monospace; }
 .welcome h1 { font-size: 24px; margin: 10px 0; }

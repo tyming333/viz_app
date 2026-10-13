@@ -70,29 +70,32 @@ const server = http.createServer((req, res) => {
   await until(() => evaluate("!!window.AttributeUI && document.getElementById('attrsConfigDialog').open"));
   assert.equal(await evaluate("document.getElementById('appSwitcher').value"), "viewer");
   assert.equal(await evaluate("Array.from(document.getElementById('appSwitcher').options).some(option=>option.value==='attribute-annotator')"), false);
-  assert.equal(await evaluate("document.querySelectorAll('.config-row').length"), 10);
+  assert.equal(await evaluate("document.getElementById('attrsConfigRows')===null && document.getElementById('attrsAddBtn')===null && document.getElementById('attrsPresetBtn')===null"), true);
   await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts, "config.png"), Buffer.from(result.data, "base64")));
-  await evaluate("document.querySelector('[data-config-field=name]').value=''");
-  await click("attrsApplyBtn");
-  assert.match(await evaluate("document.getElementById('attrsConfigError').textContent"), /名称/);
-  await click("attrsPresetBtn");
+  const config = {
+    "螺母数量": ["明确可辨", "存疑", "不可辨"],
+    "螺母轮廓及棱角": ["清晰", "基本可辨", "不可辨"],
+    "螺杆轮廓": ["清晰", "基本可辨", "不可辨"],
+    "曝光": ["正常", "轻微过曝", "严重过曝"]
+  };
+  const configFile = path.join(artifacts, "attrs-selection-table-test.json");
+  fs.writeFileSync(configFile, JSON.stringify(config));
+  assert.equal(Object.keys(JSON.parse(fs.readFileSync(path.join(root, "attribute-annotator/attrs-selection-table.example.json"), "utf8"))).length, 12);
+  await fileInput("#attrsConfigFile", configFile);
+  await until(() => evaluate("!document.getElementById('attrsConfigDialog').open && document.getElementById('attrsConfigSummary').textContent.includes('4 个')"));
+  await click("attrsConfigureBtn");
+  const invalidConfig = path.join(artifacts, "invalid-attrs-selection-table.json");
+  fs.writeFileSync(invalidConfig, JSON.stringify({}));
+  await fileInput("#attrsConfigFile", invalidConfig);
+  await until(() => evaluate("document.getElementById('attrsConfigError').textContent.length>0"));
+  assert.equal(await evaluate("document.getElementById('attrsConfigDialog').open"), true);
   await evaluate(`(() => {
     const create=URL.createObjectURL.bind(URL);
     URL.createObjectURL=blob=>{if(blob.type.startsWith('application/json'))window.lastJsonBlob=blob;return create(blob);};
     HTMLAnchorElement.prototype.click=function(){};
   })()`);
-  await click("attrsExportBtn");
-  const config = JSON.parse(await evaluate("lastJsonBlob.text()"));
-  const core = require("../attributes-core.js");
-  assert.deepEqual(config, core.exportConfig(core.defaultConfig()));
-  const configFile = path.join(artifacts, "attrs-selection-table.json");
-  fs.writeFileSync(configFile, JSON.stringify(config));
-  await click("attrsApplyBtn");
-  await click("attrsConfigureBtn");
-  await evaluate("document.querySelector('[data-config-field=options]').value='wrong'");
   await fileInput("#attrsConfigFile", configFile);
-  await until(() => evaluate("document.querySelector('[data-config-field=options]').value==='明确可辨、存疑、不可辨'"));
-  await click("attrsApplyBtn");
+  await until(() => evaluate("!document.getElementById('attrsConfigDialog').open && document.getElementById('attrsConfigError').textContent===''"));
   if (process.env.ATTRS_CONFIG_ONLY) {
     assert.deepEqual(exceptions, []);
     console.log("Attribute configuration browser smoke passed", artifacts);

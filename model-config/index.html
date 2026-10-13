@@ -17,6 +17,7 @@
     <div class="toolbar"><button id="openBtn">打开配置</button><input id="fileInput" type="file" accept=".json,application/json" hidden /><button id="undoBtn" disabled title="撤销（最多 100 步）">撤销</button><button id="redoBtn" disabled>重做</button><button id="saveBtn" class="primary" disabled>另存为新文件</button></div>
   </header>
   <div id="status" class="status" role="status" aria-live="polite">打开配置文件，开始编辑本地副本。</div>
+  <div id="fileDropOverlay" class="file-drop-overlay" hidden aria-hidden="true"><div class="file-drop-card"><strong>松开以打开 JSON 配置</strong><span>从文件夹拖入一个 .json 文件</span></div></div>
   <main id="welcome" class="welcome">
     <div class="welcome-icon" aria-hidden="true">{ }</div><p class="eyebrow">MODEL CONFIGURATION</p><h1>让每一条模型路径清晰可见</h1><p>相机、线路与模型路由，在一个独立工作区内查看和编辑。</p><button id="welcomeOpenBtn" class="primary">选择配置 JSON</button>
     <div class="welcome-features"><div><strong>递归节点树</strong><span>逐层查看父节点、子节点和叶节点</span></div><div><strong>横向编辑</strong><span>每个节点的字段直接显示、直接修改</span></div><div><strong>详细配置</strong><span>按需查看全局配置、JSON 和修改对照</span></div></div>

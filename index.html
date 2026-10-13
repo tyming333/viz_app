@@ -287,18 +287,15 @@
       </aside>
     </main>
     <dialog id="attrsConfigDialog" aria-labelledby="attrsConfigTitle">
-      <div class="config-heading"><h2 id="attrsConfigTitle">配置属性选择表</h2><button id="attrsConfigClose" type="button" aria-label="关闭配置">关闭</button></div>
-      <p>左侧填写属性词条，右侧填写可选状态。每个词条单选，不同词条可以使用相同状态名称。</p>
+      <div class="config-heading"><h2 id="attrsConfigTitle">导入属性配置</h2><button id="attrsConfigClose" type="button" aria-label="关闭配置">关闭</button></div>
+      <p>属性表仅通过 JSON 文件配置。文件格式为“属性词条: 可选状态数组”，每个词条单选。</p>
       <div class="config-actions">
-        <button id="attrsImportBtn" type="button">导入配置</button>
-        <button id="attrsExportBtn" type="button">导出配置</button>
+        <button id="attrsImportBtn" type="button">导入 JSON 配置</button>
         <input id="attrsConfigFile" type="file" accept=".json,application/json" hidden />
-        <button id="attrsAddBtn" type="button">新增属性</button>
-        <button id="attrsPresetBtn" type="button">使用螺母示例</button>
+        <a href="./attribute-annotator/attrs-selection-table.example.json" download>下载示例 JSON</a>
       </div>
-      <div id="attrsConfigRows" class="config-rows"></div>
+      <p id="attrsConfigSummary" class="attribute-target" aria-live="polite">尚未导入属性配置。</p>
       <p id="attrsConfigError" role="alert"></p>
-      <div class="config-footer"><button id="attrsApplyBtn" type="button">应用配置，开始标注</button></div>
     </dialog>
   </body>
 </html>

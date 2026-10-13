@@ -2,7 +2,7 @@
   "use strict";
   const core = window.AttributesCore;
   const byId = id => document.getElementById(id);
-  const dialog = byId("attrsConfigDialog"), rows = byId("attrsConfigRows");
+  const dialog = byId("attrsConfigDialog");
   let config = null, viewer = null, enabled = false;
 
   function setEnabled(value) {
@@ -17,55 +17,12 @@
   }
 
   function showError(error) { byId("attrsConfigError").textContent = error.message || String(error); }
-  function field(text, input) {
-    const label = document.createElement("label"), span = document.createElement("span");
-    label.className = "field";
-    span.textContent = text;
-    label.append(span, input);
-    return label;
-  }
-  function addRow(group) {
-    const row = document.createElement("div"), name = document.createElement("input"), options = document.createElement("textarea"), remove = document.createElement("button");
-    row.className = "config-row";
-    name.dataset.configField = "name";
-    name.value = group ? group.name : "";
-    name.placeholder = "例如：螺母数量";
-    options.dataset.configField = "options";
-    options.value = group ? group.options.join("、") : "";
-    options.placeholder = "明确可辨、存疑、不可辨";
-    options.spellcheck = false;
-    const optionsField = field("可选状态（用顿号、逗号或换行分隔）", options);
-    optionsField.classList.add("config-options");
-    remove.type = "button";
-    remove.textContent = "删除";
-    remove.addEventListener("click", () => row.remove());
-    row.append(field("属性词条", name), optionsField, remove);
-    rows.append(row);
-  }
-  function fillRows(value) {
-    rows.replaceChildren();
-    if (value) value.groups.forEach(addRow); else addRow();
-    byId("attrsConfigError").textContent = "";
-  }
-  function readRows() {
-    return core.normalizeConfig({ version: 1, groups: Array.from(rows.children, row => ({
-      name: row.querySelector('[data-config-field="name"]').value,
-      options: row.querySelector('[data-config-field="options"]').value.split(/[、,，\r\n]+/).map(value => value.trim()).filter(Boolean)
-    })) });
-  }
   function openConfig() {
-    fillRows(config || core.defaultConfig());
+    byId("attrsConfigSummary").textContent = config
+      ? "当前已载入 " + config.groups.length + " 个属性词条；导入其他 JSON 可替换当前配置。"
+      : "尚未导入属性配置。请导入 JSON 后开始标注。";
+    byId("attrsConfigError").textContent = "";
     if (!dialog.open) dialog.showModal();
-  }
-  function downloadConfig(value) {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(core.exportConfig(value), null, 2)], { type: "application/json" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "attrs-selection-table.json";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
   function message(text, error) {
     const output = byId("attrsMessage");
@@ -116,9 +73,22 @@
       const hasValue = Object.prototype.hasOwnProperty.call(selected, group.name);
       const selectedValue = hasValue ? selected[group.name] : undefined;
       if (hasValue && group.options.includes(selectedValue)) completed += 1;
-      const box = document.createElement("fieldset"), legend = document.createElement("legend"), buttons = document.createElement("div");
+      const box = document.createElement("section"), heading = document.createElement("div"), number = document.createElement("span"), title = document.createElement("strong"), buttons = document.createElement("div");
       box.className = "attribute-group";
-      legend.textContent = group.name;
+      heading.className = "attribute-heading";
+      number.className = "attribute-number";
+      number.textContent = String(config.groups.indexOf(group) + 1).padStart(2, "0");
+      title.className = "attribute-title";
+      title.textContent = group.name;
+      heading.append(number, title);
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "attribute-clear";
+      clear.textContent = "清空";
+      clear.dataset.attributeClear = group.name;
+      clear.disabled = !obj || !valid || !hasValue || viewer.batchPreview();
+      clear.addEventListener("click", () => choose(group, null));
+      heading.append(clear);
       buttons.className = "attribute-options";
       buttons.setAttribute("role", "group");
       buttons.setAttribute("aria-label", group.name + "，单选");
@@ -133,14 +103,7 @@
         button.addEventListener("click", () => choose(group, value));
         buttons.append(button);
       });
-      const clear = document.createElement("button");
-      clear.type = "button";
-      clear.className = "attribute-clear";
-      clear.textContent = "清空该项";
-      clear.dataset.attributeClear = group.name;
-      clear.disabled = !obj || !valid || !hasValue || viewer.batchPreview();
-      clear.addEventListener("click", () => choose(group, null));
-      box.append(legend, buttons, clear);
+      box.append(heading, buttons);
       if (hasValue && !group.options.includes(selectedValue)) {
         const warning = document.createElement("p");
         warning.textContent = "已有状态“" + selectedValue + "”不在当前配置中，选择新状态可替换。";
@@ -153,23 +116,18 @@
 
   byId("attrsModeBtn").addEventListener("click", () => setEnabled(!enabled));
   byId("attrsConfigureBtn").addEventListener("click", openConfig);
-  rows.addEventListener("input", () => { byId("attrsConfigError").textContent = ""; });
   byId("attrsConfigClose").addEventListener("click", () => dialog.close());
-  byId("attrsAddBtn").addEventListener("click", () => addRow());
-  byId("attrsPresetBtn").addEventListener("click", () => fillRows(core.defaultConfig()));
-  byId("attrsApplyBtn").addEventListener("click", () => {
-    try { config = readRows(); dialog.close(); render(); }
-    catch (error) { showError(error); }
-  });
-  byId("attrsExportBtn").addEventListener("click", () => {
-    try { downloadConfig(readRows()); byId("attrsConfigError").textContent = ""; }
-    catch (error) { showError(error); }
-  });
   byId("attrsImportBtn").addEventListener("click", () => byId("attrsConfigFile").click());
   byId("attrsConfigFile").addEventListener("change", async event => {
     const file = event.target.files[0];
     if (!file) return;
-    try { fillRows(core.normalizeConfig(JSON.parse(await file.text()))); }
+    try {
+      config = core.normalizeConfig(JSON.parse(await file.text()));
+      byId("attrsConfigSummary").textContent = "已导入 " + file.name + "（" + config.groups.length + " 个属性词条）";
+      byId("attrsConfigError").textContent = "";
+      dialog.close();
+      render();
+    }
     catch (error) { showError(error); }
     finally { event.target.value = ""; }
   });
