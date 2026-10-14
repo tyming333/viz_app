@@ -526,8 +526,21 @@ const server = http.createServer((req, res) => {
   fs.writeFileSync(localJson, JSON.stringify({[localImage]:{width:2000,height:1500,det:{objects:[{labels:["local"],bbox:[100,100,300,100,300,260,100,260],attrs:{}}]}}}));
   await call("Page.navigate", {url:require("node:url").pathToFileURL(path.join(root,"index.html")).href});
   await until(() => evaluate("!!window.AttributeUI && !!window.attachCropExport"));
-  await chooseFile("#jsonFileInput", localJson);
+  const dropData = {items:[],files:[localJson],dragOperationsMask:1};
+  await call("Input.dispatchDragEvent", {type:"dragEnter",x:500,y:300,data:dropData});
+  assert.equal(await evaluate("document.getElementById('jsonDropOverlay').hidden"), false, "dragging a file into the local page shows the import hint");
+  await call("Page.captureScreenshot").then(result => fs.writeFileSync(path.join(artifacts,"json-drop.png"),Buffer.from(result.data,"base64")));
+  await call("Input.dispatchDragEvent", {type:"dragOver",x:500,y:300,data:dropData});
+  await call("Input.dispatchDragEvent", {type:"drop",x:500,y:300,data:dropData});
   await until(() => evaluate("document.getElementById('mainImage').complete && document.getElementById('mainImage').naturalWidth===2000"));
+  assert.equal(await evaluate("document.getElementById('jsonDropOverlay').hidden && document.getElementById('jsonFileNameText').textContent==='local-annotations.json'"), true, "dropping imports annotations and updates the displayed filename");
+  for (const files of [[localImage],[localJson,localJson]]) {
+    const invalidDrop={items:[],files,dragOperationsMask:1};
+    await call("Input.dispatchDragEvent", {type:"dragEnter",x:500,y:300,data:invalidDrop});
+    await call("Input.dispatchDragEvent", {type:"dragOver",x:500,y:300,data:invalidDrop});
+    await call("Input.dispatchDragEvent", {type:"drop",x:500,y:300,data:invalidDrop});
+    assert.equal(await evaluate("document.getElementById('statusText').textContent.includes('请每次拖入一个 .json') && document.getElementById('jsonDropOverlay').hidden && !!document.querySelector('#objectList button[data-object-index=\"0\"]')"), true, "invalid drops retain the existing annotations and close the hint");
+  }
   await evaluate("document.querySelector('#objectList button[data-object-index=\"0\"]').click();HTMLAnchorElement.prototype.click=function(){window.localCropUrl=this.href};document.getElementById('canvasShell').dispatchEvent(new MouseEvent('contextmenu',{clientX:500,clientY:300,bubbles:true,cancelable:true}));document.getElementById('cropExportBtn').click()");
   await until(() => evaluate("!document.getElementById('cropExportBtn').disabled"));
   assert.equal(await evaluate("document.getElementById('cropOriginalPath').value"), localImage, "the original path is taken from the current layer and decoded for the native file dialog");

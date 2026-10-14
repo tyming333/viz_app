@@ -1090,6 +1090,48 @@
     return JSON.stringify(state.data, null, 2);
   }
 
+  const jsonDropOverlay = document.getElementById("jsonDropOverlay");
+  let fileDragDepth = 0;
+  function resetFileDrag() {
+    fileDragDepth = 0;
+    jsonDropOverlay.hidden = true;
+  }
+  function isAnnotationFileDrag(event) {
+    const input = event.target.closest?.('input[type="file"]');
+    if (input && input !== els.jsonFileInput) return false;
+    return Array.from(event.dataTransfer?.types || []).includes("Files");
+  }
+  document.addEventListener("dragenter", event => {
+    if (!isAnnotationFileDrag(event)) return;
+    event.preventDefault();
+    fileDragDepth += 1;
+    jsonDropOverlay.hidden = false;
+  });
+  document.addEventListener("dragover", event => {
+    if (!isAnnotationFileDrag(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  });
+  document.addEventListener("dragleave", event => {
+    if (!isAnnotationFileDrag(event)) return;
+    fileDragDepth = Math.max(0, fileDragDepth - 1);
+    if (!fileDragDepth || !event.relatedTarget) resetFileDrag();
+  });
+  document.addEventListener("drop", event => {
+    resetFileDrag();
+    if (!isAnnotationFileDrag(event)) return;
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length !== 1 || !/\.json$/i.test(files[0].name)) {
+      setStatus("请每次拖入一个 .json 标注文件", 0);
+      return;
+    }
+    readJsonFile(files[0]);
+  });
+  window.addEventListener("blur", resetFileDrag);
+  document.addEventListener("dragend", resetFileDrag);
+  document.addEventListener("keydown", event => { if (event.key === "Escape") resetFileDrag(); });
+
   function readJsonFile(file) {
     if (!file) return;
     const reader = new FileReader();

@@ -46,6 +46,10 @@
         <button id="exportSelectedBtn" type="button" title="导出勾选的图片和 JSON">选择导出</button>
       </div>
     </header>
+    <div id="jsonDropOverlay" hidden aria-hidden="true">
+      <strong>松开鼠标，导入 JSON</strong>
+      <span>每次拖入一个标注 JSON 文件</span>
+    </div>
 
     <main class="layout">
       <aside class="sidebar">
@@ -55,7 +59,7 @@
             <input id="prefixInput" type="text" placeholder="例如: D:/dataset/images/ 或 //服务器/共享目录/" title="支持盘符路径、file:// 路径和 Windows UNC 共享路径，例如 //172.20.7.10/共享目录/" />
           </label>
           <label class="field">
-            <span>导入 JSON 文件</span>
+            <span>导入 JSON 文件（支持拖拽）</span>
             <div class="file-picker">
               <input id="jsonFileInput" type="file" accept=".json,application/json" aria-label="导入 JSON 文件" />
               <span class="file-picker-button" aria-hidden="true">选择文件</span>
