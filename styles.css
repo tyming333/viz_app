@@ -919,7 +919,8 @@ textarea {
   font-size: var(--font-meta);
 }
 
-.toolbar-actions button.active {
+.toolbar-actions button.active,
+#editModeBtn.active {
   border-color: var(--accent);
   background: #e7f7f4;
 }
@@ -949,6 +950,11 @@ textarea {
 
 .image-info > span {
   white-space: nowrap;
+}
+
+#filterModeIndicator {
+  color: #fde68a;
+  font-weight: 600;
 }
 
 .image-info output {

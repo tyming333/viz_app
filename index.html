@@ -40,6 +40,7 @@
       </div>
       <div class="actions">
         <button id="attrsModeBtn" type="button" aria-pressed="false" aria-controls="attrsPanel">属性标注</button>
+        <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑标注</button>
         <button id="copyJsonBtn" type="button" title="复制当前 JSON">复制</button>
         <button id="downloadJsonBtn" type="button" title="导出当前 JSON">导出 JSON</button>
         <button id="exportSelectedBtn" type="button" title="导出勾选的图片和 JSON">选择导出</button>
@@ -145,25 +146,24 @@
             </div>
           </label>
           <div class="toolbar-actions">
-            <label class="batch-size-control" title="输入每行和每列显示的图片数量，范围 2 到 10">
-              <span>批量 N</span>
-              <input id="batchGridSizeInput" type="number" min="2" max="10" step="1" value="3" inputmode="numeric" aria-label="批量预览每行每列图片数" />
-            </label>
-            <button id="batchPreviewBtn" type="button" aria-pressed="false">批量预览</button>
-            <button id="editModeBtn" type="button" aria-pressed="false" title="开启标注编辑">编辑</button>
             <button id="boxVisibilityBtn" type="button" aria-pressed="true">显示框</button>
             <button id="boxLabelBtn" type="button" aria-pressed="true" title="隐藏框标签">框标签</button>
             <button id="fillToggleBtn" type="button" aria-pressed="true">框填充</button>
-            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
-            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
             <button id="showAllBoxesBtn" type="button">显示所有框</button>
             <button id="showContainedBoxesBtn" type="button" aria-pressed="false" title="显示匹配标签筛选的框及其中完全包含的框">显示包含框</button>
+            <button id="keypointVisibilityBtn" type="button" aria-pressed="true">显示点</button>
+            <button id="keypointLabelBtn" type="button" aria-pressed="true">点标签</button>
             <div class="label-zoom-size-control" role="group" aria-label="标签缩放及最小宽高" title="按实际显示框的外接矩形居中缩放，数值为最小宽高">
               <button id="labelZoomBtn" type="button" aria-pressed="false" title="开启按标签缩放">标签缩放</button>
               <input id="labelZoomSizeInput" type="number" min="64" max="8192" step="64" value="1024" inputmode="numeric" aria-label="标签缩放最小框宽高" />
               <span>px</span>
             </div>
             <button id="resetViewBtn" type="button">复位</button>
+            <div class="batch-size-control" role="group" aria-label="批量预览及网格大小">
+              <button id="batchPreviewBtn" type="button" aria-pressed="false">批量预览</button>
+              <label for="batchGridSizeInput">N</label>
+              <input id="batchGridSizeInput" type="number" min="2" max="10" step="1" value="3" inputmode="numeric" aria-label="批量预览每行每列图片数" title="每行和每列显示的图片数量，范围 2 到 10" />
+            </div>
           </div>
 
           <div class="image-adjustments" role="group" aria-label="图像调整">
@@ -231,6 +231,7 @@
           <button id="prevImageBtn" class="image-nav image-nav-prev" type="button" aria-label="上一张">&lsaquo;</button>
           <button id="nextImageBtn" class="image-nav image-nav-next" type="button" aria-label="下一张">&rsaquo;</button>
           <div class="image-info" aria-live="polite" aria-label="当前图片信息">
+            <span id="filterModeIndicator" hidden>筛选模式</span>
             <span>序号: <output id="imageInfoIndex">-</output></span>
             <span>宽高: <output id="imageInfoSize">-</output></span>
             <span>Objects: <output id="imageInfoObjects">0</output></span>

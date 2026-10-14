@@ -806,10 +806,16 @@
     clearOption.textContent = "全部 labels";
     fragment.appendChild(clearOption);
 
-    orderLabelOptions(originalOptions, state.labelSelections).forEach(function addLabelOption(value) {
+    originalOptions.forEach(function addLabelOption(value) {
       fragment.appendChild(createLabelOption(value));
     });
+    const scrollTop = els.labelSelectMenu.scrollTop;
+    const focusedValue = els.labelSelectMenu.contains(document.activeElement) ? document.activeElement.dataset.labelValue : null;
     els.labelSelectMenu.replaceChildren(fragment);
+    if (focusedValue !== null) {
+      Array.from(els.labelSelectMenu.children).find(option => option.dataset.labelValue === focusedValue)?.focus({ preventScroll: true });
+    }
+    els.labelSelectMenu.scrollTop = scrollTop;
 
     const disabled = !state.data;
     els.labelSelectButton.disabled = disabled;
@@ -1256,6 +1262,10 @@
   }
 
   function renderImageControls() {
+    const filters = state.appliedFilters;
+    document.getElementById("filterModeIndicator").hidden = !state.data || !(filters.image.trim()
+      || hasAppliedLabelFilter()
+      || [filters.widthMin, filters.widthMax, filters.heightMin, filters.heightMax].some(value => String(value).trim() !== ""));
     const visibleNames = getVisibleImageNames();
     const batchItemsChanged = visibleNames.length !== state.filteredImageNames.length
       || visibleNames.some(function hasChanged(name, index) {

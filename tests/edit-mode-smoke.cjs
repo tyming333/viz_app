@@ -207,7 +207,11 @@ const server = http.createServer((req, res) => {
   assert.equal(await evaluate(`(()=>{
     const field=document.getElementById('labelFilterField'), list=document.getElementById('imageList'), name=document.getElementById('imageFilter');
     const before={field:field.offsetHeight,list:list.offsetHeight,name:name.offsetHeight};
+    const options=()=>Array.from(document.querySelectorAll('#labelSelectMenu button[data-label-value]')).map(button=>button.dataset.labelValue);
+    const originalOrder=options();
     for(const label of editModeTest.state.labelOptions) document.querySelector('#labelSelectMenu button[data-label-value="'+label+'"]').click();
+    if(JSON.stringify(options())!==JSON.stringify(originalOrder)) throw Error('Selecting labels reordered the dropdown');
+    if(!editModeTest.state.labelOptions.every(label=>document.querySelector('#labelSelectMenu button[data-label-value="'+label+'"]').getAttribute('aria-selected')==='true')) throw Error('Selected labels are not checked');
     const grew=field.offsetHeight>before.field && list.offsetHeight<before.list && name.offsetHeight===before.name && field.scrollWidth===field.clientWidth;
     document.getElementById('clearFiltersBtn').click();return grew && field.offsetHeight===before.field;
   })()`), true, "label chips wrap downward, reclaim image-list space and restore it when cleared");
@@ -217,7 +221,7 @@ const server = http.createServer((req, res) => {
     document.getElementById('labelFilter').value='sample';document.getElementById('applyFiltersBtn').click();
     document.getElementById('labelZoomBtn').click();
     const centered=(x,y)=>Math.abs(s.panX+x*s.zoom-canvas.clientWidth/2)<1&&Math.abs(s.panY+y*s.zoom-canvas.clientHeight/2)<1;
-    const filtered=centered(350,180);
+    const filtered=centered(350,180) && !document.getElementById('filterModeIndicator').hidden;
     document.getElementById('showContainedBoxesBtn').click();const contained=centered(350,180);
     document.getElementById('showAllBoxesBtn').click();const all=centered(415,180);
     document.getElementById('boxVisibilityBtn').click();
@@ -225,7 +229,7 @@ const server = http.createServer((req, res) => {
     editModeTest.selectObject(2);size.dispatchEvent(new Event('change'));const selected=centered(720,130);
     editModeTest.selectObject(-1);document.getElementById('boxVisibilityBtn').click();document.getElementById('showAllBoxesBtn').click();
     document.getElementById('resetViewBtn').click();document.getElementById('clearFiltersBtn').click();size.value='512';size.dispatchEvent(new Event('change'));
-    return filtered&&contained&&all&&hidden&&selected;
+    return filtered&&contained&&all&&hidden&&selected&&document.getElementById('filterModeIndicator').hidden;
   })()`), true, "label zoom uses only displayed boxes, including contained boxes and individually selected hidden boxes");
   assert.equal(await evaluate(`(() => {
     const s=editModeTest.state, canvas=document.getElementById('canvasShell');
