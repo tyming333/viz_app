@@ -275,6 +275,7 @@ const server = http.createServer((req, res) => {
   })()`), true, "selected breathing outlines retain their label color when global boxes are hidden");
   await click("resetViewBtn");
   await evaluate("editModeTest.selectObject(0)");
+  assert.deepEqual(await evaluate("[document.getElementById('bboxWidthText').textContent,document.getElementById('bboxHeightText').textContent]"), ["200 px","160 px"], "selected object shows its enclosing rectangle dimensions below the coordinates");
   const blank = await evaluate("(() => {const s=editModeTest.state,r=document.getElementById('canvasShell').getBoundingClientRect();return {x:r.left+s.panX+1000*s.zoom,y:r.top+s.panY+800*s.zoom};})()");
   await call("Input.dispatchMouseEvent", {type:"mousePressed",...blank,button:"left",clickCount:1});
   await call("Input.dispatchMouseEvent", {type:"mouseReleased",...blank,button:"left",clickCount:1});

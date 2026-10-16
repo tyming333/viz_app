@@ -117,6 +117,8 @@
     objectList: document.getElementById("objectList"),
     selectedBadge: document.getElementById("selectedBadge"),
     bboxSizeText: document.getElementById("bboxSizeText"),
+    bboxWidthText: document.getElementById("bboxWidthText"),
+    bboxHeightText: document.getElementById("bboxHeightText"),
     labelsEditor: document.getElementById("labelsEditor"),
     bboxGrid: document.getElementById("bboxGrid"),
     addKeypointBtn: document.getElementById("addKeypointBtn"),
@@ -859,6 +861,18 @@
     return width + " x " + height;
   }
 
+  function renderBboxDimensions(obj) {
+    els.bboxSizeText.textContent = obj ? formatBboxSize(obj.bbox) : "未选中";
+    if (!obj) {
+      els.bboxWidthText.textContent = els.bboxHeightText.textContent = "—";
+      return;
+    }
+    const xs = obj.bbox.filter((_, index) => index % 2 === 0);
+    const ys = obj.bbox.filter((_, index) => index % 2 === 1);
+    els.bboxWidthText.textContent = Math.round((Math.max(...xs) - Math.min(...xs)) * 100) / 100 + " px";
+    els.bboxHeightText.textContent = Math.round((Math.max(...ys) - Math.min(...ys)) * 100) / 100 + " px";
+  }
+
   function bboxToPoints(bbox) {
     return [
       [bbox[0], bbox[1]],
@@ -1591,7 +1605,7 @@
     els.addRectangleBtn.disabled = !state.editMode || !state.currentImage;
     els.addQuadrilateralBtn.disabled = !state.editMode || !state.currentImage;
     els.selectedBadge.textContent = obj ? "#" + (state.selectedObjectIndex + 1) : "未选中";
-    els.bboxSizeText.textContent = obj ? formatBboxSize(obj.bbox) : "未选中";
+    renderBboxDimensions(obj);
     els.labelsEditor.disabled = !editable;
     els.applyObjectBtn.disabled = !editable;
     els.deleteObjectBtn.disabled = !editable;
@@ -2703,7 +2717,7 @@
       const height = els.mainImage.naturalHeight || 0;
       if (width && height) obj.bbox = clampBboxToImage(obj.bbox, width, height);
       updateEditorBboxInputs();
-      els.bboxSizeText.textContent = formatBboxSize(obj.bbox);
+      renderBboxDimensions(obj);
       renderOverlay();
       return;
     }

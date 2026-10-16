@@ -1543,7 +1543,8 @@ textarea {
 /* 编辑内容增多或窗口变矮时内部滚动，避免挤没 Objects 列表。 */
 .inspector .editor-panel {
   min-height: 0;
-  max-height: calc(100% - 180px);
+  flex-shrink: 0;
+  max-height: calc(100% - 150px);
   overflow-y: auto;
 }
 
@@ -1571,6 +1572,29 @@ textarea {
   min-width: 0;
   height: 22px;
   padding: 0 4px;
+}
+
+.bbox-dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 5px;
+  color: var(--muted);
+}
+
+.bbox-dimensions > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 2px 5px;
+  background: var(--surface-2);
+  border-radius: 4px;
+}
+
+.bbox-dimensions output {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 .inspector .keypoint-editor {
